@@ -1,0 +1,14 @@
+{
+  "note": "Evaluation corpus (plan section 9.1). PDFs are not committed; run `bun corpus/fetch.ts` to download open-access (CC BY) papers into corpus/pdfs/.",
+  "papers": [
+    {
+      "id": "rct_plos",
+      "genre": "RCT protocol (CONSORT/SPIRIT)",
+      "doi": "10.1371/journal.pone.0293623",
+      "pmcid": "PMC10615270",
+      "license": "CC BY 4.0",
+      "url": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0293623&type=printable",
+      "expect": { "pages": 17, "min_paras": 60 }
+    }
+  ]
+}

@@ -1,0 +1,267 @@
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, BookOpenText, FileUp, Loader2, MoreHorizontal, Play, RotateCcw, Search, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { api, isDesktop } from "@/lib/rpc";
+import { useApp } from "@/lib/store";
+import { cn } from "@/lib/utils";
+import type { DocStatus, DocSummary } from "../../../shared/types";
+import { STAGE_LABEL } from "../../../shared/types";
+
+export const STATUS: Record<DocStatus, { label: string; cls: string }> = {
+	imported: { label: "브리핑 대기", cls: "bg-secondary text-secondary-foreground" },
+	queued: { label: "대기 중", cls: "bg-secondary text-secondary-foreground" },
+	processing: { label: "처리 중", cls: "bg-primary/15 text-primary" },
+	needs_review: { label: "검토 필요", cls: "bg-amber-500/15 text-amber-700 dark:text-amber-400" },
+	done: { label: "완료", cls: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" },
+	failed: { label: "실패", cls: "bg-destructive/15 text-destructive" },
+	canceled: { label: "취소됨", cls: "bg-secondary text-muted-foreground" },
+};
+
+type Filter = "all" | "active" | "done" | "attention";
+
+export function LibraryView() {
+	const qc = useQueryClient();
+	const { go, setBriefFor } = useApp();
+	const [query, setQuery] = useState("");
+	const [filter, setFilter] = useState<Filter>("all");
+	const [genre, setGenre] = useState<string | null>(null);
+	const [drag, setDrag] = useState(false);
+	const docs = useQuery({ queryKey: ["docs"], queryFn: () => api.listDocs({}) });
+	const settings = useQuery({ queryKey: ["settings"], queryFn: () => api.getSettings({}) });
+
+	const importPaths = useMutation({
+		mutationFn: (paths: string[]) => api.importPdfs({ paths }),
+		onSuccess: ({ docIds }) => {
+			qc.invalidateQueries({ queryKey: ["docs"] });
+			if (docIds.length) setBriefFor(docIds);
+			else toast.error("PDF 파일을 찾지 못했습니다");
+		},
+		onError: (e: Error) => toast.error(e.message),
+	});
+
+	const pick = async () => {
+		const { paths } = await api.pickPdfs({});
+		if (paths.length) importPaths.mutate(paths);
+	};
+
+	const onDrop = (e: React.DragEvent) => {
+		e.preventDefault();
+		setDrag(false);
+		// WKWebView exposes the dropped file's path through File.path on Electrobun; fall back to the picker
+		const paths = Array.from(e.dataTransfer.files)
+			.map((f) => (f as File & { path?: string }).path)
+			.filter((p): p is string => !!p);
+		if (paths.length) importPaths.mutate(paths);
+		else void pick();
+	};
+
+	const genres = useMemo(() => [...new Set((docs.data ?? []).map((d) => d.genre).filter(Boolean))] as string[], [docs.data]);
+	const rows = useMemo(() => {
+		const q = query.trim().toLowerCase();
+		return (docs.data ?? []).filter((d) => {
+			if (q && ![d.title, d.authors, d.journal, d.genre, d.doi, d.fileName].some((x) => (x ?? "").toLowerCase().includes(q))) return false;
+			if (genre && d.genre !== genre) return false;
+			if (filter === "active") return d.status === "processing" || d.status === "queued" || d.status === "imported";
+			if (filter === "done") return d.status === "done";
+			if (filter === "attention") return d.status === "needs_review" || d.status === "failed" || d.status === "canceled";
+			return true;
+		});
+	}, [docs.data, query, filter, genre]);
+
+	const total = (docs.data ?? []).reduce((a, d) => a + d.costUsd, 0);
+
+	return (
+		<div className="flex h-full flex-col">
+			<header className="flex items-center gap-3 border-b px-6 py-4">
+				<div>
+					<h1 className="text-lg font-semibold">라이브러리</h1>
+					<p className="text-xs text-muted-foreground">
+						논문 {docs.data?.length ?? 0}편 · 누적 API 비용 ${total.toFixed(2)}
+					</p>
+				</div>
+				<div className="ml-auto flex items-center gap-2">
+					<div className="relative">
+						<Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
+						<Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="제목, 저자, 저널, DOI 검색" className="w-72 pl-8" />
+					</div>
+					<Button onClick={pick} disabled={importPaths.isPending}>
+						{importPaths.isPending ? <Loader2 className="animate-spin" /> : <FileUp />} PDF 추가
+					</Button>
+				</div>
+			</header>
+
+			<div className="flex flex-col gap-3 px-6 pt-4">
+				{settings.data && !settings.data.hasApiKey && (
+					<Alert>
+						<AlertTriangle />
+						<AlertTitle>Anthropic API 키가 없습니다</AlertTitle>
+						<AlertDescription>
+							해설 작성에는 Claude API가 필요합니다.{" "}
+							<button className="underline" onClick={() => go({ name: "settings" })}>
+								설정에서 키를 입력하세요.
+							</button>
+						</AlertDescription>
+					</Alert>
+				)}
+				{settings.data && !settings.data.engineOk && (
+					<Alert variant="destructive">
+						<AlertTriangle />
+						<AlertTitle>PDF 엔진(Python)을 실행할 수 없습니다</AlertTitle>
+						<AlertDescription className="font-mono text-xs">{settings.data.engineInfo}</AlertDescription>
+					</Alert>
+				)}
+				<div
+					onDragOver={(e) => {
+						e.preventDefault();
+						setDrag(true);
+					}}
+					onDragLeave={() => setDrag(false)}
+					onDrop={onDrop}
+					onClick={pick}
+					data-testid="dropzone"
+					className={cn(
+						"flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-6 py-7 text-center transition",
+						drag ? "border-primary bg-primary/5" : "border-border hover:bg-accent/40",
+					)}
+				>
+					<FileUp className="size-6 text-muted-foreground" />
+					<div className="text-sm font-medium">논문 PDF를 여기에 끌어다 놓거나 클릭해서 고르세요</div>
+					<div className="text-xs text-muted-foreground">여러 편을 한 번에 넣을 수 있습니다. 원문은 바뀌지 않고, 해설은 한국어로 붙습니다.</div>
+					{!isDesktop && <div className="text-[11px] text-muted-foreground">(브라우저 개발 모드)</div>}
+				</div>
+				<div className="flex items-center gap-3">
+					<ToggleGroup type="single" value={filter} onValueChange={(v) => v && setFilter(v as Filter)} variant="outline" size="sm">
+						<ToggleGroupItem value="all">전체</ToggleGroupItem>
+						<ToggleGroupItem value="active">진행 중</ToggleGroupItem>
+						<ToggleGroupItem value="done">완료</ToggleGroupItem>
+						<ToggleGroupItem value="attention">확인 필요</ToggleGroupItem>
+					</ToggleGroup>
+					{genres.length > 0 && (
+						<div className="flex flex-wrap items-center gap-1.5">
+							{genres.map((g) => (
+								<Badge key={g} variant={genre === g ? "default" : "outline"} className="cursor-pointer" onClick={() => setGenre(genre === g ? null : g)}>
+									{g}
+								</Badge>
+							))}
+						</div>
+					)}
+				</div>
+			</div>
+
+			<div className="min-h-0 flex-1 overflow-auto px-6 py-3">
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead className="w-[38%]">제목</TableHead>
+							<TableHead>저널 · 연도</TableHead>
+							<TableHead>장르</TableHead>
+							<TableHead>상태</TableHead>
+							<TableHead className="text-right">정독 비율</TableHead>
+							<TableHead className="text-right">비용</TableHead>
+							<TableHead>추가일</TableHead>
+							<TableHead />
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{rows.length === 0 && (
+							<TableRow>
+								<TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+									{docs.isLoading ? "불러오는 중…" : "아직 논문이 없습니다."}
+								</TableCell>
+							</TableRow>
+						)}
+						{rows.map((d) => (
+							<DocRow key={d.id} d={d} />
+						))}
+					</TableBody>
+				</Table>
+			</div>
+		</div>
+	);
+}
+
+function DocRow({ d }: { d: DocSummary }) {
+	const qc = useQueryClient();
+	const { go, setBriefFor } = useApp();
+	const st = STATUS[d.status];
+	const open = () => {
+		if (d.status === "done" || d.status === "needs_review") go({ name: "reader", docId: d.id });
+		else if (d.status === "imported") setBriefFor([d.id]);
+		else go({ name: "processing", docId: d.id });
+	};
+	const restart = async () => {
+		try {
+			await api.startJob({ docId: d.id });
+			qc.invalidateQueries({ queryKey: ["docs"] });
+			go({ name: "processing", docId: d.id });
+		} catch (e) {
+			toast.error((e as Error).message);
+		}
+	};
+	const del = async () => {
+		if (!confirm(`"${d.title}"을(를) 라이브러리에서 지웁니다. 해설과 메모도 함께 지워집니다.`)) return;
+		await api.deleteDoc({ docId: d.id });
+		qc.invalidateQueries({ queryKey: ["docs"] });
+	};
+	return (
+		<TableRow className="cursor-pointer" onClick={open} data-testid={`doc-${d.id}`}>
+			<TableCell>
+				<div className="line-clamp-2 font-medium">{d.title}</div>
+				<div className="truncate text-xs text-muted-foreground">{d.authors ?? d.fileName}</div>
+			</TableCell>
+			<TableCell className="text-xs">
+				{[d.journal, d.year].filter(Boolean).join(" · ") || "-"}
+				{d.pageCount ? <div className="text-muted-foreground">{d.pageCount}쪽</div> : null}
+			</TableCell>
+			<TableCell className="max-w-40 truncate text-xs">{d.genre ?? "-"}</TableCell>
+			<TableCell>
+				<Badge className={cn("border-0", st.cls)}>
+					{d.status === "processing" && <Loader2 className="animate-spin" />}
+					{st.label}
+				</Badge>
+				{d.status === "processing" && <div className="mt-1 text-[11px] text-muted-foreground">{STAGE_LABEL[d.stage]}</div>}
+				{d.status === "failed" && d.error && <div className="mt-1 line-clamp-2 max-w-56 text-[11px] text-destructive">{d.error}</div>}
+			</TableCell>
+			<TableCell className="text-right text-xs">{d.closeShare != null ? `${Math.round(d.closeShare * 100)}%` : "-"}</TableCell>
+			<TableCell className="text-right text-xs">${d.costUsd.toFixed(2)}</TableCell>
+			<TableCell className="text-xs text-muted-foreground">{new Date(d.createdAt).toLocaleDateString("ko-KR")}</TableCell>
+			<TableCell onClick={(e) => e.stopPropagation()}>
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button variant="ghost" size="icon" className="size-7">
+							<MoreHorizontal />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end">
+						{(d.status === "done" || d.status === "needs_review") && (
+							<DropdownMenuItem onClick={() => go({ name: "reader", docId: d.id })}>
+								<BookOpenText /> 읽기
+							</DropdownMenuItem>
+						)}
+						<DropdownMenuItem onClick={() => go({ name: "processing", docId: d.id })}>
+							<Play /> 처리 과정 보기
+						</DropdownMenuItem>
+						{(d.status === "failed" || d.status === "canceled") && (
+							<DropdownMenuItem onClick={restart}>
+								<RotateCcw /> 이어서 처리
+							</DropdownMenuItem>
+						)}
+						{d.status === "imported" && <DropdownMenuItem onClick={() => setBriefFor([d.id])}>브리핑하고 시작</DropdownMenuItem>}
+						<DropdownMenuSeparator />
+						<DropdownMenuItem className="text-destructive" onClick={del}>
+							<Trash2 /> 삭제
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
+			</TableCell>
+		</TableRow>
+	);
+}

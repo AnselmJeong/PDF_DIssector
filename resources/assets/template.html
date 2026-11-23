@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A reading guide to __TITLE__, built from the paper's own paragraphs.">
+<title>__TITLE__</title>
+<style>
+/* Layout after Hallmark (MIT, https://github.com/Nutlope/hallmark): Long Document, Editorial theme. System font stacks only, so the page works offline. */
+:root {
+  --color-paper: oklch(97% 0.007 86); --color-paper-2: oklch(94% 0.010 86); --color-paper-3: oklch(91% 0.012 84);
+  --color-ink: oklch(16% 0.012 280); --color-ink-2: oklch(31% 0.011 280); --color-muted: oklch(48% 0.010 75);
+  --color-rule: oklch(86% 0.009 85); --color-rule-2: oklch(64% 0.010 80);
+  --color-accent: oklch(49% 0.130 152); --color-accent-ink: oklch(98% 0.005 88); --color-focus: oklch(52% 0.135 152);
+  --color-mark: oklch(90% 0.050 152 / 0.48); --color-flash: oklch(92% 0.060 152); --color-plate: oklch(99% 0.003 86);
+  --color-scrim: oklch(18% 0.010 280 / 0.78); --color-on-scrim: oklch(96% 0.005 86); --color-note: oklch(38% 0.012 280); --color-guide: oklch(94.5% 0.022 152);
+  --font-display: "Avenir Next", "Seravek", "Bahnschrift", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC", sans-serif;
+  --font-body: "Charter", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", "Source Serif 4", "Noto Serif", "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  --font-note: var(--font-display);
+  --space-3xs: 2px; --space-2xs: 4px; --space-xs: 8px; --space-sm: 12px; --space-md: 16px; --space-lg: 24px; --space-xl: 40px; --space-2xl: 64px; --space-3xl: 96px; --space-4xl: 144px;
+  --text-xs: clamp(12.5px, calc(0.15vw + 10.6px), 15px); --text-sm: clamp(13px, calc(0.2vw + 11px), 15px); --text-md: clamp(15px, calc(0.3vw + 11.8px), 18px); --text-note: 17px; --text-read: clamp(17px, calc(0.45vw + 12.5px), 22px); --text-lead: clamp(19px, calc(0.5vw + 13.6px), 24px); --text-head: clamp(19px, calc(0.4vw + 14px), 24px); --text-title: clamp(28px, 2.6vw, 52px);
+  --gutter: clamp(16px, 4vw, 64px); --measure: calc(46 * var(--text-read));
+  --nav: clamp(14rem, 24vw, 36rem); --gap: clamp(var(--space-xl), 4vw, 88px); --cols: minmax(0, var(--nav)) var(--gap) minmax(0, 1fr); --rule-hair: 1px; --rule-heavy: 4px; --bar-h: 49px;
+  --dur-micro: 120ms; --dur-short: 220ms; --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-paper: oklch(17% 0.008 86); --color-paper-2: oklch(20% 0.009 86); --color-paper-3: oklch(23% 0.010 84);
+    --color-ink: oklch(93% 0.008 86); --color-ink-2: oklch(84% 0.008 86); --color-muted: oklch(70% 0.010 80);
+    --color-rule: oklch(31% 0.010 80); --color-rule-2: oklch(48% 0.010 80);
+    --color-accent: oklch(74% 0.110 152); --color-accent-ink: oklch(18% 0.010 152); --color-focus: oklch(76% 0.120 152);
+    --color-mark: oklch(38% 0.060 152 / 0.65); --color-flash: oklch(34% 0.060 152); --color-plate: oklch(92% 0.004 86);
+    --color-scrim: oklch(8% 0.006 280 / 0.85); --color-note: oklch(78% 0.008 86); --color-guide: oklch(22.5% 0.024 152);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --color-paper: oklch(17% 0.008 86); --color-paper-2: oklch(20% 0.009 86); --color-paper-3: oklch(23% 0.010 84);
+  --color-ink: oklch(93% 0.008 86); --color-ink-2: oklch(84% 0.008 86); --color-muted: oklch(70% 0.010 80);
+  --color-rule: oklch(31% 0.010 80); --color-rule-2: oklch(48% 0.010 80);
+  --color-accent: oklch(74% 0.110 152); --color-accent-ink: oklch(18% 0.010 152); --color-focus: oklch(76% 0.120 152);
+  --color-mark: oklch(38% 0.060 152 / 0.65); --color-flash: oklch(34% 0.060 152); --color-plate: oklch(92% 0.004 86);
+  --color-scrim: oklch(8% 0.006 280 / 0.85); --color-note: oklch(78% 0.008 86); --color-guide: oklch(22.5% 0.024 152);
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { overflow-x: clip; -webkit-text-size-adjust: 100%; scroll-padding-top: calc(var(--bar-h) + var(--space-md)); }
+body { margin: 0; overflow-x: clip; background: var(--color-paper); color: var(--color-ink); font: 400 var(--text-md)/1.6 var(--font-body); font-synthesis: none;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+button { font: inherit; color: inherit; }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+b, strong { font-weight: 600; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--color-ink); overflow-wrap: break-word; min-width: 0; text-wrap: balance; }
+p { text-wrap: pretty; }
+:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+::selection { background: var(--color-mark); }
+html { scrollbar-color: var(--color-rule-2) var(--color-paper); }
+.container { max-width: calc(var(--nav) + var(--gap) + var(--measure) + 2 * var(--gutter)); margin-inline: auto; padding-inline: var(--gutter); }
+b.num { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--color-ink); }
+
+/* inline maths: simple formulas are set as text in the face around them; KaTeX takes the rest at the text's own size and colour */
+.imath { white-space: nowrap; }
+.imath sup, .imath sub { font-size: 0.72em; line-height: 0; position: relative; vertical-align: baseline; }
+.imath sup { top: -0.48em; } .imath sub { top: 0.26em; }
+.imath .katex { font-size: 1em; line-height: 1; text-rendering: auto; }
+.imath .katex .katex-html { white-space: nowrap; }
+
+/* controls: text set in the label face, one filled state on the view switch */
+.textbtn { background: none; border: 0; padding: var(--space-2xs) 0; font: 500 var(--text-sm)/1.4 var(--font-display); color: var(--color-ink-2);
+  text-decoration: underline var(--rule-hair) var(--color-rule-2); text-underline-offset: 0.25em; cursor: pointer; white-space: nowrap;
+  transition: text-decoration-color var(--dur-short) var(--ease-out), color var(--dur-short) var(--ease-out); }
+.textbtn:hover { color: var(--color-ink); text-decoration-color: var(--color-accent); }
+.textbtn:active, .seg button:active, .mm-node:active, .pstep button:active, .pterm:active { color: var(--color-accent); }
+.linkbtn { background: none; border: 0; padding: 0; font: inherit; color: var(--color-ink); text-decoration: underline var(--rule-hair) var(--color-rule-2); text-underline-offset: 0.2em; cursor: pointer; }
+.linkbtn:hover { text-decoration-color: var(--color-accent); }
+details > summary { cursor: pointer; }
+
+/* the masthead: title and source */
+.mast { padding-block: var(--space-lg) var(--space-md); }
+.mast-top { display: flex; gap: var(--space-lg); align-items: baseline; justify-content: space-between; }
+.title { font-size: var(--text-title); line-height: 1.12; letter-spacing: -0.012em; margin: 0; max-width: 40ch; }
+.meta { margin: var(--space-sm) 0 0; font: 400 var(--text-sm)/1.5 var(--font-display); color: var(--color-muted); }
+
+/* the map: the thesis on the left wired to the parts as rows, a part's steps open under it */
+.mapsec { border-top: var(--rule-heavy) solid var(--color-ink); }
+.mapgrid { position: relative; display: grid; grid-template-columns: var(--cols); column-gap: 0; padding-block: var(--space-lg) var(--space-xl); }
+.mm-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.mm-lines path { fill: none; stroke: var(--color-rule-2); stroke-width: 1.25; }
+.mm-lines path.dash { stroke-dasharray: 5 4; }
+.lede { align-self: start; }
+.thesis { margin: 0; font: 400 var(--text-lead)/1.5 var(--font-note); color: var(--color-ink); }
+.lede-acts { display: flex; flex-wrap: wrap; gap: var(--space-2xs) var(--space-lg); align-items: baseline; margin-top: var(--space-md); }
+.qs { flex: 1 1 100%; order: 2; font: 400 var(--text-md)/1.6 var(--font-note); }
+.qs:not([open]) { flex: 0 1 auto; order: 0; }
+.qs > summary { font: 500 var(--text-sm)/1.5 var(--font-display); color: var(--color-ink-2); width: max-content; max-width: 100%; }
+.qs .q { margin: var(--space-sm) 0 var(--space-3xs); font-weight: 600; color: var(--color-ink); }
+.qs .a { margin: 0; color: var(--color-note); }
+.qs .a .linkbtn { margin-left: var(--space-xs); font: 500 var(--text-xs)/1.4 var(--font-display); }
+.mm { grid-column: 3; min-width: 0; }
+.mm ul { list-style: none; margin: 0; padding: 0; }
+.mm-parts { border-top: var(--rule-hair) solid var(--color-rule-2); }
+.mm-part { border-bottom: var(--rule-hair) solid var(--color-rule); }
+.mm-row { display: flex; align-items: center; gap: var(--space-sm); min-height: 40px; }
+.mm-node { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: var(--space-sm); text-align: left; background: none; border: 0; padding: var(--space-xs) 0; cursor: pointer;
+  font: 500 var(--text-md)/1.4 var(--font-display); color: var(--color-ink); transition: color var(--dur-short) var(--ease-out); }
+.mm-node:hover { color: var(--color-accent); }
+.mm-n { flex: none; min-width: 1.4em; font-variant-numeric: tabular-nums; color: var(--color-muted); }
+.mm-t { flex: 1; min-width: 0; }
+.mm-part.skip .mm-node { color: var(--color-muted); }
+@media (pointer: coarse) { .mm-row { min-height: 44px; } }
+
+/* the reading bar: back to the map, the two views, terms, and how far through the paper the reader is */
+.bar { position: sticky; top: 0; z-index: 20; background: var(--color-paper); border-top: var(--rule-hair) solid var(--color-rule); }
+.bar-in { display: flex; align-items: center; gap: var(--space-lg); min-height: var(--bar-h); }
+.bar .grow { flex: 1; }
+.seg { display: inline-flex; border: var(--rule-hair) solid var(--color-ink); }
+.seg button { background: none; border: 0; padding: var(--space-2xs) var(--space-sm); min-height: 32px; cursor: pointer; font: 500 var(--text-sm)/1.2 var(--font-display); color: var(--color-ink-2); white-space: nowrap; }
+.seg button + button { border-left: var(--rule-hair) solid var(--color-ink); }
+.seg button[aria-pressed="true"] { background: var(--color-ink); color: var(--color-paper); }
+.progress { height: 2px; background: var(--color-rule); }
+#progress { display: block; height: 100%; background: var(--color-accent); transform-origin: 0 50%; transform: scaleX(0); }
+
+/* the reading: each part keeps its head in the margin while its paragraphs run in one measure */
+.reading { padding-block: var(--space-xl) var(--space-3xl); }
+.part { display: grid; grid-template-columns: var(--cols); column-gap: 0; padding-bottom: var(--space-xl); }
+.part + .part { border-top: var(--rule-hair) solid var(--color-rule); padding-top: var(--space-xl); }
+.phead { grid-column: 1; align-self: start; position: sticky; top: calc(var(--bar-h) + var(--space-lg)); scroll-margin-top: calc(var(--bar-h) + var(--space-lg));
+  max-height: calc(100dvh - var(--bar-h) - var(--space-2xl)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: var(--space-xs); }
+.pnav-d > summary { display: none; font: 500 var(--text-xs)/1.6 var(--font-display); color: var(--color-muted); width: max-content; }
+.pbox { border: var(--rule-hair) solid var(--color-rule); padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-md); }
+.pbox + .pbox, .pnav-d .pbox { margin-top: var(--space-md); }
+.plab { margin: 0 0 var(--space-xs); font: 500 var(--text-xs)/1.4 var(--font-display); color: var(--color-muted); }
+.psteps, .pterms { list-style: none; margin: 0; padding: 0; }
+.psteps { counter-reset: st; }
+.pstep { counter-increment: st; border-left: var(--rule-hair) solid var(--color-rule); padding-left: var(--space-sm); }
+.pstep[data-rel="qualifies"] { border-left-style: dashed; border-left-color: var(--color-rule-2); }
+body.guess .pstep[data-rel="qualifies"] { border-left-style: solid; border-left-color: var(--color-rule); }
+.pstep button, .pterm { display: block; width: 100%; text-align: left; background: none; border: 0; padding: var(--space-3xs) 0; cursor: pointer;
+  font: 400 var(--text-xs)/1.55 var(--font-note); color: var(--color-muted); overflow-wrap: break-word; transition: color var(--dur-short) var(--ease-out); }
+.pstep button { padding-left: 1.6em; text-indent: -1.6em; }  /* steps wrap in full; the number hangs in the margin */
+.pstep button::before { content: counter(st); display: inline-block; min-width: 1.6em; text-indent: 0; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--color-ink-2); }
+.pstep button:hover, .pterm:hover { color: var(--color-ink); }
+.pstep.on { border-left-color: var(--color-ink); }
+.pstep.on button { color: var(--color-ink); }
+.pstep.on button::before { color: var(--color-accent); }
+.pterm b { font-weight: 500; color: var(--color-ink-2); margin-right: var(--space-xs); }
+.pmore > summary { font: 400 var(--text-xs)/1.6 var(--font-display); color: var(--color-muted); width: max-content; }
+.pmore > summary:hover { color: var(--color-ink); }
+.ptitle { margin: 0; font-size: var(--text-head); line-height: 1.3; }
+.pclaim { margin: var(--space-sm) 0 0; font: 400 var(--text-md)/1.6 var(--font-note); color: var(--color-note); }
+.pbody { grid-column: 3; min-width: 0; font-size: var(--text-read); }
+.orig, .readfor, .note, .ahead, .recall, .gap, .fx > p, .fx dl, .skipd > summary, .figcard > .cap, .phead-n { max-width: var(--measure); }
+.ahead { font: 600 var(--text-md)/1.5 var(--font-body); color: var(--color-ink-2); margin: var(--space-xl) 0 var(--space-md); }
+.pbody > .ahead:first-child { margin-top: 0; }
+.para { position: relative; margin: 0 0 var(--space-lg); scroll-margin-top: calc(var(--bar-h) + var(--space-lg)); }
+.pid { position: absolute; right: 100%; top: 0.35em; margin-right: var(--space-md); white-space: nowrap; font: 400 var(--text-xs)/1.5 var(--font-display); color: var(--color-muted); font-variant-numeric: tabular-nums; }
+.t-close .pid { color: var(--color-ink); font-weight: 600; }
+.para.fn { margin-left: var(--space-lg); }
+.readfor { margin: 0 0 var(--space-sm); font: 400 var(--text-md)/1.65 var(--font-note); color: var(--color-note); }
+.note { margin: 0; font: 400 var(--text-md)/1.7 var(--font-note); color: var(--color-note); }
+/* everything the guide wrote sits in one tinted box with an accent bar and a small label; the paper's own text stays plain */
+.readfor, .t-skim > .note, .skipd > summary, .nd[open], .fx[open], .recall[open] { background: var(--color-guide); border-left: 3px solid var(--color-accent); padding: var(--space-xs) var(--space-md) var(--space-sm); }
+.recall[open] { border-top: 0; }
+.glab { display: block; font-weight: 500; }
+.glab, .nd[open] > summary, .fx[open] > summary, .recall[open] > summary { margin: 0 0 var(--space-3xs); font: 500 var(--text-xs)/1.6 var(--font-display); color: var(--color-accent); }
+.orig { margin: var(--space-2xs) 0 0; font: 400 var(--text-read)/1.75 var(--font-body); color: var(--color-ink); overflow-wrap: break-word; hyphens: manual; }
+.t-skip .orig, .fn .orig { font-size: var(--text-md); }
+.ow, .nd { margin: var(--space-xs) 0 0; }
+.ow > summary, .nd > summary, .fx > summary, .recall details > summary { font: 500 var(--text-xs)/1.6 var(--font-display); color: var(--color-muted); width: max-content; max-width: 100%; }
+.ow > summary:hover, .nd > summary:hover, .fx > summary:hover, .recall summary:hover, .qs > summary:hover { color: var(--color-ink); }
+.t-close > .ow > summary { display: none; }
+body.v-gist .t-close > .ow > summary, .t-close > .ow:not([open]) > summary { display: list-item; }
+.nd { margin-top: var(--space-sm); }
+.nd .note { margin-top: var(--space-2xs); }
+body.v-gist .t-close > .readfor, body.v-gist .ahead { display: none; }
+body.v-gist .para.t-close { display: flex; flex-direction: column; }
+body.v-gist .t-close > .nd { order: -1; margin: 0 0 var(--space-2xs); }
+.t-skip .skipd > summary { list-style: none; font: 400 var(--text-sm)/1.6 var(--font-note); color: var(--color-note); }
+.skipd > summary::-webkit-details-marker { display: none; }
+.skipd > summary::after { content: ""; display: inline-block; width: 5px; height: 5px; margin-left: var(--space-xs); border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: translateY(-3px) rotate(45deg); }
+.skipd[open] > summary::after { transform: translateY(0) rotate(-135deg); }
+.skipd > summary:hover { color: var(--color-ink); }
+mark.hl { color: inherit; background: linear-gradient(to bottom, transparent 0.42em, var(--color-mark) 0.42em, var(--color-mark) 1.12em, transparent 1.12em); -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.term { text-decoration: underline dotted var(--rule-hair) var(--color-rule-2); text-underline-offset: 0.22em; cursor: help; position: relative; }
+.term::after { content: attr(data-def); position: absolute; left: 0; top: 1.7em; z-index: 25; width: max-content; max-width: min(320px, 80vw); padding: var(--space-xs) var(--space-sm);
+  background: var(--color-paper); color: var(--color-ink); border: var(--rule-hair) solid var(--color-rule-2); font: 400 var(--text-sm)/1.5 var(--font-display); white-space: normal;
+  opacity: 0; visibility: hidden; pointer-events: none; transition: opacity var(--dur-micro) var(--ease-out) 0s, visibility 0s linear var(--dur-micro); }
+.term:hover::after { opacity: 1; visibility: visible; transition: opacity var(--dur-micro) var(--ease-out) 0.8s, visibility 0s linear 0.8s; }
+.term:focus::after { opacity: 1; visibility: visible; transition: none; }
+.gap { font: 400 var(--text-xs)/1.5 var(--font-display); color: var(--color-muted); margin: var(--space-2xs) 0; }
+.gap b { color: var(--color-ink); }
+.formula { margin: var(--space-sm) 0 0; }
+.formula .katex-display { margin: var(--space-xs) 0; overflow-x: auto; overflow-y: hidden; padding: var(--space-2xs) 0; }
+.formula .katex { font-size: 1.08em; }
+.fx { margin: 0; font: 400 var(--text-md)/1.65 var(--font-note); color: var(--color-note); }
+.fx .note { margin: var(--space-xs) 0 0; }
+.fx dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2xs) var(--space-md); margin: var(--space-xs) 0 0; font-size: var(--text-md); }
+.fx dt { color: var(--color-ink); } .fx dd { margin: 0; color: var(--color-note); }
+.fx .why { margin: var(--space-xs) 0 0; color: var(--color-note); }
+.fx .why b { font-weight: 400; font-size: var(--text-sm); color: var(--color-muted); }
+.crop { margin: var(--space-sm) 0 0; }
+.crop img { max-width: 100%; display: block; background: var(--color-plate); outline: var(--rule-hair) solid var(--color-rule); outline-offset: -1px; }
+.cap, .src, .tpage { font: 400 var(--text-xs)/1.5 var(--font-display); color: var(--color-muted); margin: var(--space-2xs) 0 0; }
+.figcard { margin: 0 0 var(--space-lg); padding-top: var(--space-sm); border-top: var(--rule-hair) solid var(--color-rule); }
+.figcard > .cap { font: 400 var(--text-md)/1.5 var(--font-body); color: var(--color-ink-2); margin: 0 0 var(--space-xs); }
+.figcard img { max-width: 100%; height: auto; display: block; margin: var(--space-xs) 0; background: var(--color-plate); }
+.tbl { overflow-x: auto; margin: var(--space-xs) 0; }
+.tbl table { border-collapse: collapse; font: 400 var(--text-sm)/1.45 var(--font-display); font-variant-numeric: tabular-nums; }
+.tbl td { border-bottom: var(--rule-hair) solid var(--color-rule); padding: var(--space-2xs) var(--space-xs); vertical-align: top; }
+.pagebtn { background: none; border: 0; padding: 0; font: 500 var(--text-xs)/1.5 var(--font-display); color: var(--color-ink-2); text-decoration: underline var(--rule-hair) var(--color-rule-2); text-underline-offset: 0.2em; cursor: pointer; }
+.pagebtn:hover { text-decoration-color: var(--color-accent); }
+.pagebtn:active { color: var(--color-accent); }
+body.v-gist .crop, body.v-gist .figcard, body.v-gist .fx { display: none; }
+.recall { margin: var(--space-xl) 0 0; padding-top: var(--space-sm); border-top: var(--rule-hair) solid var(--color-rule-2); font: 400 var(--text-md)/1.65 var(--font-note); }
+.recall > summary { font: 600 var(--text-sm)/1.5 var(--font-display); color: var(--color-ink); }
+.recall ol { margin: var(--space-xs) 0 0; padding-left: var(--space-lg); } .recall li { margin: var(--space-xs) 0; color: var(--color-ink); }
+.recall details { margin-top: var(--space-3xs); } .recall details p { margin: var(--space-2xs) 0 0; color: var(--color-note); }
+.flash { animation: flash 1.6s var(--ease-out); }
+@keyframes flash { from { background: var(--color-flash); } to { background: transparent; } }
+
+/* look-up list of terms */
+.lookup[open] { display: flex; flex-direction: column; }
+.lookup { width: min(560px, calc(100% - var(--space-xl))); max-height: min(80vh, 760px); border: var(--rule-hair) solid var(--color-ink); border-radius: 0; padding: 0; background: var(--color-paper); color: var(--color-ink); }
+.lookup::backdrop { background: var(--color-scrim); }
+.lkbar { flex: none; display: flex; justify-content: space-between; align-items: center; padding: var(--space-sm) var(--space-md); background: var(--color-paper); border-bottom: var(--rule-hair) solid var(--color-rule); }
+.lkbar h2 { font-size: var(--text-md); margin: 0; }
+.lkbody { overflow: auto; padding: var(--space-2xs) var(--space-md) var(--space-md); font: 400 var(--text-md)/1.6 var(--font-note); }
+.lkgroup { margin: var(--space-md) 0 var(--space-2xs); font: 600 var(--text-xs)/1.5 var(--font-display); color: var(--color-muted); }
+.lkitem { padding: var(--space-xs) 0; border-bottom: var(--rule-hair) solid var(--color-rule); color: var(--color-note); }
+.lkitem .lkterm { font-weight: 600; display: block; color: var(--color-ink); }
+.lkitem .linkbtn { margin-left: var(--space-xs); font: 500 var(--text-xs)/1.4 var(--font-display); }
+
+.viewer { position: fixed; inset: 0; z-index: 40; background: var(--color-scrim); display: none; padding: calc(env(safe-area-inset-top, 0px) + var(--space-sm)) var(--space-sm) calc(env(safe-area-inset-bottom, 0px) + var(--space-sm)); }
+.viewer.open { display: flex; flex-direction: column; align-items: center; gap: var(--space-xs); }
+.viewer .vbar { display: flex; gap: var(--space-sm); align-items: center; color: var(--color-on-scrim); font: 400 var(--text-sm)/1.4 var(--font-display); }
+.viewer .vbar button { background: none; color: var(--color-on-scrim); border: var(--rule-hair) solid var(--color-on-scrim); padding: var(--space-2xs) var(--space-sm); cursor: pointer; font: 500 var(--text-sm)/1.4 var(--font-display); }
+.viewer .vimg { overflow: auto; max-width: 100%; flex: 1; }
+.viewer img { max-width: min(100%, 900px); height: auto; display: block; margin: 0 auto; background: var(--color-plate); }
+.foot { color: var(--color-muted); font: 400 var(--text-xs)/1.6 var(--font-display); padding-block: var(--space-lg) var(--space-xl); border-top: var(--rule-hair) solid var(--color-rule); }
+
+@media (max-width: 60rem) {
+  .mapgrid { display: block; }
+  .part { display: block; }
+  .phead { position: static; max-height: none; overflow: visible; margin-bottom: var(--space-lg); max-width: var(--measure); padding-right: 0; }
+  .pnav-d > summary { display: list-item; margin-top: var(--space-sm); }
+  .pnav-d .pbox:has(> .psteps) > .plab { display: none; }
+  .reading .container { padding-left: calc(var(--gutter) + var(--space-xl)); }
+  .pbody { max-width: var(--measure); }
+  .mm { margin-top: var(--space-lg); }
+  .mm-parts { border-top: 0; border-left: var(--rule-hair) solid var(--color-rule-2); margin-left: var(--space-xs); }
+  .mm-part { border-bottom: 0; padding-left: var(--space-md); }
+  .mm-part[data-rel="qualifies"] { border-left: var(--rule-hair) dashed var(--color-rule-2); margin-left: -1px; }
+  .mm.guess .mm-part[data-rel="qualifies"] { border-left-style: solid; }
+}
+@media (max-width: 40rem) {
+  :root { --gutter: 16px; --text-read: 17px; --text-lead: 19px; }
+  .reading .container { padding-left: var(--gutter); }
+  .pid { position: static; float: left; margin-right: var(--space-xs); line-height: 1.75; top: 0; }
+  .t-skip .pid, .pid:has(+ .note, + .readfor) { float: none; display: block; }
+  .bar-in { gap: var(--space-md); }
+  .para.fn { margin-left: var(--space-md); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flash { animation: none; outline: 2px solid var(--color-focus); }
+  .textbtn, .mm-node, .pstep button, .pterm, .term::after, .term:hover::after { transition: none; }
+}
+@media print {
+  .bar, .langbtn, .pagebtn, .mm-guess, .pnav-d, .lookup { display: none !important; }
+  .part { display: block; } .phead { position: static; margin-bottom: var(--space-md); } .pbody { max-width: none; }
+  .para { break-inside: avoid; } body { background: var(--color-plate); }
+}
+</style>
+</head>
+<body>
+<header class="mast"><div class="container">
+  <div class="mast-top"><h1 class="title" id="title"></h1>
+    <button type="button" class="textbtn langbtn" id="langbtn" hidden></button></div>
+  <p class="meta" id="meta"></p>
+</div></header>
+<section class="mapsec" id="mapsec"><div class="container mapgrid" id="mapgrid">
+  <div class="lede" id="lede">
+    <p class="thesis" id="thesis"></p>
+    <div class="lede-acts"><details class="qs" id="qs" hidden><summary id="qsum"></summary><div id="qbody"></div></details>
+      <button type="button" class="textbtn mm-guess" id="guessbtn"></button></div>
+  </div>
+  <div class="mm" id="mm"></div>
+</div></section>
+<div class="bar" id="bar"><div class="container bar-in">
+  <button type="button" class="textbtn" id="tocbtn" aria-controls="mapsec"></button>
+  <span class="grow"></span>
+  <span class="seg" id="views"></span>
+  <button type="button" class="textbtn" id="lkbtn" aria-haspopup="dialog"></button>
+</div><div class="progress" aria-hidden="true"><span id="progress"></span></div></div>
+<main class="reading"><div class="container" id="stream"></div></main>
+<footer class="foot"><div class="container" id="foot"></div></footer>
+<dialog class="lookup" id="lookup" aria-labelledby="lktitle">
+  <div class="lkbar"><h2 id="lktitle"></h2><button type="button" class="textbtn" id="lkclose"></button></div>
+  <div class="lkbody" id="lkbody"></div>
+</dialog>
+<div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-labelledby="vtitle">
+  <div class="vbar"><span id="vtitle"></span><button type="button" id="vclose"></button></div>
+  <div class="vimg" id="vimgbox"></div>
+</div>
+__KATEX__
+<script id="guide-data" type="application/json">__DATA__</script>
+<script>
+(function () {
+  var D = JSON.parse(document.getElementById("guide-data").textContent);
+  var LANG = D.default_lang, VIEW = "full", lastFocus = null, GUESS = false;
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var UI = {
+    zh: { other: "English", full: "全文", gist: "只看小结", readFor: "读时注意", orig: "原文", note: "读后小结", fn: "注",
+      page: function (a, b) { return a === b ? "第 " + a + " 页" : "第 " + a + "–" + b + " 页"; },
+      viewPage: function (p) { return "查看原页（第 " + p + " 页）"; }, closeBtn: "关闭", openV: "开放版本", gap: "开放版本这里多出：",
+      tablePage: "这里有表格", foot: function (v, d, s, m) { return "由 literature-guide-read " + v + " 生成于 " + d + "　来源：" + s + "（" + m + "）"; },
+      fromPdf: "PDF 原文", check: "核对原式", explain: "解释", fwhy: "作用", recall: "回想", answer: "答案",
+      guess: "先猜关系", reveal: "显示关系", questions: function (n) { return "你的 " + n + " 个问题"; },
+      stats: function (n, m) { return n + " 段，精读 " + m + " 段"; }, lookup: "术语", lookupTitle: "术语", toc: "论证结构",
+      map: "论证结构", root: "结论", partN: function (n) { return "第 " + n + " 部分"; }, jumpTo: function (p) { return "点击跳到 " + p; }, steps: function (t) { return "展开步骤：" + t; },
+      noTerms: "这篇没有标出术语。", structure: "本节结构", more: function (n) { return "另外 " + n + " 个术语"; } },
+    en: { other: "中文", full: "Full text", gist: "Summaries only", readFor: "Read for", orig: "Original text", note: "Summary", fn: "Note",
+      page: function (a, b) { return a === b ? "p. " + a : "pp. " + a + "–" + b; },
+      viewPage: function (p) { return "View page " + p; }, closeBtn: "Close", openV: "Open version", gap: "The open version has more words here: ",
+      tablePage: "A table appears here", foot: function (v, d, s, m) { return "Built by literature-guide-read " + v + " on " + d + ". Source: " + s + " (" + m + ")"; },
+      fromPdf: "From the PDF", check: "Check against the PDF", explain: "Explanation", fwhy: "Role", recall: "Recall", answer: "Answer",
+      guess: "Guess the links", reveal: "Show the links", questions: function (n) { return n === 1 ? "Your question" : "Your " + n + " questions"; },
+      stats: function (n, m) { return n + " paragraphs, " + m + " to read closely"; }, lookup: "Terms", lookupTitle: "Terms", toc: "Argument",
+      map: "Argument structure", root: "Conclusion", partN: function (n) { return "Part " + n; }, jumpTo: function (p) { return "Click to go to " + p; }, steps: function (t) { return "Show the steps: " + t; },
+      noTerms: "No terms are marked in this reading.", structure: "This part's structure", more: function (n) { return n + " more terms"; } }
+  };
+  var REL = { supports: ["支持", "supports"], explains: ["解释", "explains"], qualifies: ["限定", "qualifies"], extends: ["推广", "extends"],
+    frames: ["界定", "frames"], challenges: ["质疑", "challenges"], answers: ["回应", "answers"], "rules out": ["排除", "rules out"],
+    implies: ["推出", "implies"], names: ["命名", "names"], concludes: ["得出", "concludes"], raises: ["提出", "raises"] };
+  function rname(r) { var x = REL[r] || [r, r]; return LANG === "zh" ? x[0] : x[1]; }
+  function T(t) { return D.types[t] || { en: t, zh: t, level: 1, family: "plain" }; }
+  function tname(t) { return T(t)[LANG] || t; }
+  function L(v) { if (v == null) return ""; if (typeof v === "string") return v; return v[LANG] || v[D.langs[0]] || ""; }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function $(id) { return document.getElementById(id); }
+  function btn(cls, text, fn) { var b = el("button", cls, text); b.type = "button"; if (fn) b.addEventListener("click", fn); return b; }
+  var NUM = /(\$\s?\d[\d.,]*(?:[–-]\d[\d.,]*)?|\d[\d.,]*(?:[–-]\d[\d.,]*)?\s?(?:%|percent|美元|元|次|名|人|分钟|倍|件|支|瓶|例|min\b)|\d+(?:\.\d+)?\s?:\s?\d+|[Nn]\s?=\s?\d+)/g;
+  var IMATH = /\$(?![\s$])([^$\n]+?)(?<!\s)\$/g;
+  function isMath(s) { return !/^\d/.test(s) || /[\\_^=<>()]/.test(s) || !/\s/.test(s); }
+  function mathSpans(text) {
+    // $...$ spans are inline LaTeX (a span starting with a digit is money unless it holds LaTeX or no spaces)
+    var out = [], m; IMATH.lastIndex = 0;
+    while ((m = IMATH.exec(text))) {
+      if (!isMath(m[1])) { IMATH.lastIndex = m.index + 1; continue; }
+      out.push([m.index, m.index + m[0].length, m[1]]);
+    }
+    return out;
+  }
+  // Simple inline TeX (letters, digits, Greek, operators, one level of ^ and _) is set as text in the surrounding face,
+  // upright like the Unicode maths the PDF text layer gives, so both read the same; anything else goes to KaTeX.
+  var GREEK = { alpha: "α", beta: "β", gamma: "γ", delta: "δ", epsilon: "ε", varepsilon: "ε", zeta: "ζ", eta: "η", theta: "θ", vartheta: "ϑ",
+    iota: "ι", kappa: "κ", lambda: "λ", mu: "μ", nu: "ν", xi: "ξ", pi: "π", rho: "ρ", sigma: "σ", tau: "τ", upsilon: "υ", phi: "φ", varphi: "φ",
+    chi: "χ", psi: "ψ", omega: "ω", Gamma: "Γ", Delta: "Δ", Theta: "Θ", Lambda: "Λ", Xi: "Ξ", Pi: "Π", Sigma: "Σ", Upsilon: "Υ", Phi: "Φ", Psi: "Ψ", Omega: "Ω",
+    infty: "∞", ldots: "…", dots: "…", cdots: "⋯", prime: "′", partial: "∂", "%": "%", "{": "{", "}": "}", "#": "#", "&": "&", "_": "_", "$": "$" };
+  var TEXOP = { le: "≤", leq: "≤", ge: "≥", geq: "≥", ne: "≠", neq: "≠", times: "×", cdot: "·", pm: "±", mp: "∓", approx: "≈", sim: "∼", simeq: "≃",
+    to: "→", rightarrow: "→", leftarrow: "←", in: "∈", notin: "∉", propto: "∝", equiv: "≡", ll: "≪", gg: "≫", mid: "|" };
+  var TEXSP = { ",": " ", ";": " ", ":": " ", " ": " ", quad: " ", qquad: "  ", "!": "" };
+  var TEXT = { text: 1, mathrm: 1, textrm: 1, operatorname: 1, mathit: 1, textit: 1, mathnormal: 1 };
+  function texPlain(tex) {
+    var i = 0, n = tex.length;
+    function fail() { throw new Error("tex"); }
+    function name() {
+      i++; var m = /^[A-Za-z]+/.exec(tex.slice(i));
+      if (m) { i += m[0].length; return m[0]; }
+      if (i >= n) fail();
+      return tex[i++];
+    }
+    function braced() {
+      while (tex[i] === " ") i++;
+      if (tex[i] !== "{") fail();
+      var j = tex.indexOf("}", i); if (j < 0) fail();
+      var s = tex.slice(i + 1, j); if (/[\^_{}\\$]/.test(s)) fail();
+      i = j + 1; return s;
+    }
+    function seq(out, depth, inBrace) {
+      var afterOp = true;
+      function txt(s) { out.appendChild(document.createTextNode(s)); }
+      function op(s) { txt(afterOp ? s : " " + s + " "); afterOp = true; }
+      function atom(s) { txt(s); afterOp = false; }
+      while (i < n) {
+        var c = tex[i];
+        if (c === "}") { if (inBrace) return; fail(); }
+        if (c === " ") { i++; continue; }
+        if (c === "{") { i++; seq(out, depth, true); i++; afterOp = false; continue; }
+        if (c === "^" || c === "_") {
+          if (depth > 0) fail();
+          i++; while (tex[i] === " ") i++;
+          var s = el(c === "^" ? "sup" : "sub");
+          if (tex[i] === "{") { i++; seq(s, depth + 1, true); i++; }
+          else if (tex[i] === "\\") { var nm = name(); if (!GREEK[nm]) fail(); s.textContent = GREEK[nm]; }
+          else if (i < n && /[A-Za-z0-9*']/.test(tex[i])) { s.textContent = tex[i] === "'" ? "′" : tex[i]; i++; }
+          else fail();
+          out.appendChild(s); afterOp = false; continue;
+        }
+        if (c === "\\") {
+          var k = name();
+          if (k === "left" || k === "right" || k === "big" || k === "Big") { if (tex[i] === ".") i++; continue; }
+          if (TEXSP[k] != null) { txt(TEXSP[k]); continue; }
+          if (GREEK[k]) { atom(GREEK[k]); continue; }
+          if (TEXOP[k]) { op(TEXOP[k]); continue; }
+          if (TEXT[k]) { var b = braced(); atom(/^text/.test(k) ? b : b.replace(/\s+/g, "")); continue; }  // maths mode drops spaces: \mathrm{l o g} is "log"
+          fail();
+        }
+        if ("+-=<>".indexOf(c) >= 0) { i++; op(c === "-" ? "−" : c); continue; }
+        if (c === ",") { i++; txt(/\d/.test(tex[i] || "") ? "," : ", "); afterOp = true; continue; }
+        if (c === "(" || c === "[" || c === "|") { i++; txt(c); afterOp = true; continue; }
+        if (/[A-Za-z0-9.)\]\/!';:*]/.test(c)) { i++; atom(c === "'" ? "′" : c === "*" ? "∗" : c); continue; }
+        fail();
+      }
+      if (inBrace) fail();
+    }
+    try { var f = document.createDocumentFragment(); seq(f, 0, false); return f; } catch (err) { return null; }
+  }
+  function mathInto(node, tex, inline) {
+    if (inline) { var f = texPlain(tex); if (f) { node.appendChild(f); return; } }
+    if (window.katex) { try { katex.render(tex, node, { throwOnError: false, displayMode: !inline }); return; } catch (err) {} }
+    node.appendChild(el("code", null, tex));
+  }
+  // text[a, b) into node; math spans come whole (callers never cut one), plain runs go through fn
+  function textInto(node, text, a, b, ms, fn) {
+    var pos = a;
+    ms.forEach(function (m) {
+      if (m[0] < a || m[1] > b) return;
+      if (m[0] > pos) fn(node, text.slice(pos, m[0]));
+      var sp = el("span", "imath"); mathInto(sp, m[2], true); node.appendChild(sp); pos = m[1];
+    });
+    if (b > pos) fn(node, text.slice(pos, b));
+    return node;
+  }
+  // the PDF's fraction slash (U+2044) squeezes "R⁄(R + 1)" in most text faces; show a plain slash, same length, offsets unchanged
+  function plain(node, s) { node.appendChild(document.createTextNode(s.replace(/⁄/g, "/"))); }
+  function numsInto(node, text) {
+    var last = 0, m; NUM.lastIndex = 0;
+    while ((m = NUM.exec(text))) {
+      if (m.index > last) plain(node, text.slice(last, m.index));
+      node.appendChild(el("b", "num", m[0])); last = m.index + m[0].length;
+    }
+    plain(node, text.slice(last));
+  }
+  function withNums(node, text) { text = text == null ? "" : String(text); return textInto(node, text, 0, text.length, mathSpans(text), numsInto); }
+  function withMath(node, text) { text = text == null ? "" : String(text); return textInto(node, text, 0, text.length, mathSpans(text), plain); }
+  function bare(text) { return String(text || "").replace(/\$([^$\n]+?)\$/g, "$1"); }
+  function pnum(id) { return parseInt(String(id).slice(1), 10); }
+  function rangeIds(r) { var m = /^P(\d+)(?:-P?(\d+))?$/.exec(r); var out = []; for (var i = +m[1]; i <= +(m[2] || m[1]); i++) out.push("P" + i); return out; }
+  function plab(p) { return D.page_labels[String(p)] || p; }
+  function pageText(ids) {
+    var ps = [];
+    ids.forEach(function (id) { var it = D.items[id]; if (it) (it.pages || [it.page]).forEach(function (p) { if (p != null) ps.push(+plab(p)); }); });
+    if (!ps.length) return "";
+    return UI[LANG].page(Math.min.apply(null, ps), Math.max.apply(null, ps));
+  }
+  function partOf(pid) {
+    var n = pnum(pid);
+    for (var i = 0; i < D.parts.length; i++) { var r = rangeIds(D.parts[i].range); if (n >= pnum(r[0]) && n <= pnum(r[r.length - 1])) return D.parts[i]; }
+    return null;
+  }
+  function partNo(p) { var k = 0, out = null; D.parts.forEach(function (q) { if (!q.skip) { k++; if (q === p) out = k; } }); return out; }
+  function idLabel(id) { return id[0] === "N" && D.items[id] ? UI[LANG].fn + " " + (D.items[id].num || "") : id; }
+  var ALL = [];
+  D.order.forEach(function (id) {
+    var add = function (eid, host) { var g = D.guide[eid]; if (!g) return; (g.els || []).forEach(function (e, i) { ALL.push({ e: e, id: eid, i: i, part: partOf(host) }); }); };
+    if (D.items[id].type !== "para") return;
+    add(id, id);
+    (D.items[id].notes || []).forEach(function (nid) { add(nid, id); });
+  });
+  var hosted = {};
+  Object.keys(D.figs).forEach(function (cid) { var h = D.figs[cid].host; if (h) (hosted[h] = hosted[h] || []).push(cid); });
+
+  function barH() { return $("bar").getBoundingClientRect().height; }
+  function jump(id, idx) {
+    var art = $(id); if (!art) return;
+    var target = art;
+    if (idx != null) { var mk = $(id + "-e" + idx); if (mk) { var det = mk.closest("details"); if (det) det.open = true; target = mk; } }
+    window.scrollTo({ top: Math.max(0, target.getBoundingClientRect().top + window.pageYOffset - barH() - 24), behavior: reduce ? "auto" : "smooth" });
+    [art, target].forEach(function (n) { n.classList.remove("flash"); void n.offsetWidth; n.classList.add("flash"); });
+  }
+
+  // page viewer; its image element is made on first open, so the page never carries an empty one
+  function vimg() {
+    var im = $("vimg");
+    if (!im) { im = el("img"); im.id = "vimg"; im.alt = ""; im.addEventListener("load", viewerScrollFocus); $("vimgbox").appendChild(im); }
+    return im;
+  }
+  function openPage(p) {
+    var src = D.page_images[String(p)]; if (!src) return;
+    lastFocus = document.activeElement;
+    var im = vimg(); im.src = src; im.alt = UI[LANG].viewPage(plab(p));
+    $("vtitle").textContent = UI[LANG].page(plab(p), plab(p));
+    $("viewer").classList.add("open");
+    viewerScrollFocus(); $("vclose").focus();
+  }
+  function viewerScrollFocus() {
+    var region = $("vimgbox");
+    region.tabIndex = region.scrollHeight > region.clientHeight || region.scrollWidth > region.clientWidth ? 0 : -1;
+  }
+  function closePage() { $("viewer").classList.remove("open"); if (lastFocus) lastFocus.focus(); }
+  $("vclose").addEventListener("click", closePage);
+  $("viewer").addEventListener("click", function (e) { if (e.target.id === "viewer") closePage(); });
+  document.addEventListener("keydown", function (e) {
+    if (!$("viewer").classList.contains("open")) return;
+    if (e.key === "Escape") closePage();
+    var scroll = $("vimgbox");
+    if (document.activeElement === scroll && ["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight", "PageDown", "PageUp", "Home", "End"].indexOf(e.key) >= 0) {
+      e.preventDefault();
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") scroll.scrollLeft += e.key === "ArrowLeft" ? -40 : 40;
+      else if (e.key === "Home" || e.key === "End") scroll.scrollTop = e.key === "Home" ? 0 : scroll.scrollHeight;
+      else scroll.scrollTop += (e.key === "ArrowUp" || e.key === "PageUp" ? -1 : 1) * (e.key.indexOf("Page") === 0 ? scroll.clientHeight : 40);
+    }
+    if (e.key === "Tab") {
+      e.preventDefault(); viewerScrollFocus();
+      var region = $("vimgbox"), close = $("vclose");
+      (region.tabIndex === 0 && document.activeElement !== region ? region : close).focus();
+    }
+  });
+  function pageBtn(p) { var b = btn("pagebtn", UI[LANG].viewPage(plab(p))); b.addEventListener("click", function () { b.focus(); openPage(p); }); return b; }
+
+  // hover definitions for terms that recur after their definition
+  var GLOSS = null;
+  function glossary() {
+    if (GLOSS) return GLOSS;
+    GLOSS = (D.glossary || []).filter(function (t) { return t.term && t.term.length >= 2; })
+      .sort(function (a, b) { return b.term.length - a.term.length; });
+    return GLOSS;
+  }
+  function annotateTerms(div, id) {
+    glossary().forEach(function (t) {
+      if (t.src === id) return;  // the defining paragraph already highlights the definition
+      var def = L(t.x); if (!def) return;
+      var walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT), node, done = false;
+      var rx = new RegExp((/^[\w]/.test(t.term) ? "\\b" : "") + t.term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + (/[\w]$/.test(t.term) ? "\\b" : ""), "i");
+      while (!done && (node = walker.nextNode())) {
+        if (node.parentNode.closest(".term, .imath")) continue;  // never inside a formula
+        var m = rx.exec(node.data); if (!m) continue;
+        var span = el("span", "term", m[0]); span.dataset.def = t.term + ": " + bare(def); span.tabIndex = 0;
+        var after = node.splitText(m.index); after.data = after.data.slice(m[0].length);
+        node.parentNode.insertBefore(span, after); done = true;
+      }
+    });
+  }
+  function origNode(id) {
+    var it = D.items[id], g = D.guide[id] || {}, div = el("div", "orig"), text = it.text, pos = 0, spans = [], ms = mathSpans(text);
+    div.lang = D.meta.language || "en";
+    (g.els || []).forEach(function (e, i) {
+      if (!e.hl) return;
+      var s = e.hl[0], t = e.hl[1];
+      ms.forEach(function (m) { if (m[0] < t && s < m[1]) { s = Math.min(s, m[0]); t = Math.max(t, m[1]); } });  // a highlight takes a formula whole
+      spans.push({ s: s, e: t, t: e.t, i: i, label: L(e.s) || L(e.x) });
+    });
+    spans.sort(function (a, b) { return a.s - b.s; });
+    spans.forEach(function (sp) {
+      if (sp.s < pos) return;
+      textInto(div, text, pos, sp.s, ms, plain);
+      var mk = textInto(el("mark", "hl"), text, sp.s, sp.e, ms, plain);
+      mk.id = id + "-e" + sp.i; mk.title = tname(sp.t) + (sp.label ? ": " + bare(sp.label) : "");
+      div.appendChild(mk); pos = sp.e;
+    });
+    textInto(div, text, pos, text.length, ms, plain);
+    annotateTerms(div, id);
+    return div;
+  }
+  function gapNode(id) {
+    var g = ((D.open.text_check || {})[id] || []).filter(function (w) { return /\p{L}/u.test(w); });  // dropped citation numbers alone are not worth a line
+    if (!g.length) return null;
+    var p = el("p", "gap", UI[LANG].gap); g.forEach(function (w, i) { if (i) plain(p, " … "); p.appendChild(el("b", null, w)); });
+    return p;
+  }
+  function cropNode(id) {
+    var src = D.crops && D.crops[id]; if (!src) return null;
+    var box = el("figure", "crop"), im = el("img"); im.src = src; im.alt = UI[LANG].fromPdf + " " + id; im.loading = "lazy";
+    box.appendChild(im); var cap = el("figcaption", "cap", UI[LANG].fromPdf);
+    if (D.items[id] && D.page_images[String(D.items[id].page)]) { plain(cap, "　"); cap.appendChild(pageBtn(D.items[id].page)); }
+    box.appendChild(cap); return box;
+  }
+  function mediaInto(art, id, g) {
+    // formulas show as typeset maths; the PDF crop, the explanation and the symbols sit behind one toggle
+    var u = UI[LANG], eqCrops = [], tblCrops = [];
+    if (D.crops && D.crops[id]) eqCrops.push(id);
+    ((D.frag_crops || {})[id] || []).forEach(function (fid) { ((D.items[fid] || {}).table ? tblCrops : eqCrops).push(fid); });
+    var fs = ((g && g.els) || []).filter(function (e) { return e.t === "formula" && e.tex; });
+    if (fs.length) {
+      fs.forEach(function (e) { var m = el("div", "formula"); mathInto(m, e.tex); art.appendChild(m); });
+      var fx = el("details", "fx"); fx.appendChild(el("summary", null, eqCrops.length ? u.check : u.explain));
+      eqCrops.forEach(function (c) { var n = cropNode(c); if (n) fx.appendChild(n); });
+      fs.forEach(function (e) {
+        if (e.x) fx.appendChild(withNums(el("p", "note"), L(e.x)));
+        if (e.syms && e.syms.length) {
+          var dl = el("dl");
+          e.syms.forEach(function (sy) { var dt = el("dt"); if (/[\\^_{}]/.test(sy.s)) { dt.className = "imath"; mathInto(dt, sy.s, true); } else dt.textContent = sy.s; dl.appendChild(dt); dl.appendChild(withNums(el("dd"), L(sy.m))); });
+          fx.appendChild(dl);
+        }
+        if (e.why) { var w = el("p", "why"); w.appendChild(el("b", null, u.fwhy + (LANG === "zh" ? "：" : ": "))); withNums(w, L(e.why)); fx.appendChild(w); }
+      });
+      if (fx.childNodes.length > 1) art.appendChild(fx);
+    } else {
+      eqCrops.forEach(function (c) { var n = cropNode(c); if (n) art.appendChild(n); });
+    }
+    tblCrops.forEach(function (c) { var n = cropNode(c); if (n) art.appendChild(n); });
+    if (D.table_pages[id] && D.page_images[String(D.table_pages[id])]) {
+      var tp = el("p", "tpage", u.tablePage + "　"); tp.appendChild(pageBtn(D.table_pages[id])); art.appendChild(tp);
+    }
+  }
+  function paraNode(id, isNote) {
+    var it = D.items[id], g = D.guide[id], u = UI[LANG], tier = g ? g.tier : "skim";
+    var art = el("article", "para t-" + (tier === "close" || tier === "skip" ? tier : "skim") + (isNote ? " fn" : "")); art.id = id;
+    var pid = el("span", "pid", idLabel(id)); pid.title = [g ? bare(L(g.role)) : "", pageText([id])].filter(Boolean).join("　");
+    var gap = gapNode(id);
+    function orig(open) { var d = el("details", "ow"); d.appendChild(el("summary", null, u.orig)); d.appendChild(origNode(id)); if (gap) d.appendChild(gap); d.open = open; return d; }
+    if (!g) { art.appendChild(pid); art.appendChild(origNode(id)); return art; }
+    if (tier === "skip") {
+      var sd = el("details", "ow skipd"), sm = el("summary");
+      sm.appendChild(pid); withNums(sm, L(g.note)); sd.appendChild(sm); sd.appendChild(origNode(id)); if (gap) sd.appendChild(gap);
+      art.appendChild(sd);
+    } else if (tier === "close") {
+      var hasNote = !!L(g.note);
+      art.appendChild(pid);
+      if (g.read) { var rf = el("p", "readfor"); rf.appendChild(el("b", "glab", u.readFor)); withNums(rf, L(g.read)); art.appendChild(rf); }
+      art.appendChild(orig(VIEW !== "gist" || !hasNote));
+      mediaInto(art, id, g);
+      if (hasNote) {  // the summary comes after the paragraph's formulas and crops: read, then check
+        var nd = el("details", "nd"); nd.appendChild(el("summary", null, u.note)); nd.appendChild(withNums(el("p", "note"), L(g.note)));
+        nd.open = VIEW === "gist"; art.appendChild(nd);
+      }
+      return art;
+    } else {
+      var sn = el("p", "note"); sn.appendChild(el("b", "glab", u.note));
+      art.appendChild(pid); art.appendChild(withNums(sn, L(g.note)));
+      art.appendChild(orig(false));
+    }
+    mediaInto(art, id, g);
+    return art;
+  }
+  function figNode(cid) {
+    var it = D.items[cid], f = D.figs[cid] || {}, a = D.open.assets[cid], card = el("figure", "figcard");
+    card.appendChild(withMath(el("figcaption", "cap"), (a && a.caption) || it.text));
+    if (a && a.img && /^data:/i.test(a.img)) { var im = el("img"); im.src = a.img; im.alt = (a.caption || it.text); im.loading = "lazy"; card.appendChild(im); }
+    if (a && a.rows) {
+      var w = el("div", "tbl"), t = el("table"); w.tabIndex = 0;
+      w.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); w.scrollLeft += e.key === "ArrowLeft" ? -40 : 40; }
+      });
+      a.rows.forEach(function (r) { var tr = el("tr"); r.forEach(function (c) { tr.appendChild(el("td", null, c)); }); t.appendChild(tr); });
+      w.appendChild(t); card.appendChild(w);
+    }
+    var row = el("p", "src");
+    if (a) plain(row, UI[LANG].openV + "　");
+    if (D.page_images[String(f.page)]) row.appendChild(pageBtn(f.page));
+    if (row.childNodes.length) card.appendChild(row);
+    return card;
+  }
+  function renderHeader() {
+    var u = UI[LANG];
+    document.documentElement.lang = LANG === "zh" ? "zh-CN" : "en";
+    $("title").textContent = L(D.meta.title) || D.doc.title_guess || D.doc.source;
+    var paras = D.order.filter(function (id) { return D.items[id].type === "para"; });
+    var close = paras.filter(function (id) { return D.guide[id] && D.guide[id].tier === "close"; }).length;
+    $("meta").textContent = [L(D.meta.author), L(D.meta.source), u.stats(paras.length, close)].filter(Boolean).join("　");
+    var th = $("thesis"); th.textContent = ""; withNums(th, L(D.thesis));
+    var qs = $("qs"), qb = $("qbody"), Q = D.questions || [];
+    qb.textContent = ""; qs.hidden = !Q.length; $("qsum").textContent = u.questions(Q.length);
+    Q.forEach(function (q) {
+      qb.appendChild(withNums(el("p", "q"), L(q.q)));
+      var a = withNums(el("p", "a"), L(q.a));
+      (q.p || []).forEach(function (pid) { a.appendChild(btn("linkbtn", pid, function () { jump(pid); })); });
+      qb.appendChild(a);
+    });
+    var lb = $("langbtn"); lb.hidden = D.langs.length < 2; lb.textContent = u.other;
+    $("mapsec").setAttribute("aria-label", u.map);
+    $("tocbtn").textContent = u.toc; $("lkbtn").textContent = u.lookup; $("lktitle").textContent = u.lookupTitle; $("lkclose").textContent = u.closeBtn;
+    $("vclose").textContent = u.closeBtn;
+    $("foot").textContent = u.foot(D.skill_version, D.generated, D.doc.source || "", D.doc.mode || "") + (D.open.source ? "　" + u.openV + ": " + D.open.source : "");
+    var vs = $("views"); vs.textContent = "";
+    [["full", u.full], ["gist", u.gist]].forEach(function (x) {
+      var b = btn(null, x[1], function () { setView(x[0]); }); b.dataset.v = x[0]; b.setAttribute("aria-pressed", VIEW === x[0] ? "true" : "false"); vs.appendChild(b);
+    });
+  }
+
+  // the map is the page's only contents: the thesis (left) wired to every part (rows), a part's steps open under it
+  function relTip(p) {
+    var u = UI[LANG], byId = {};
+    D.parts.forEach(function (q) { byId[q.id] = q; });
+    return ((D.logic.rels || {})[p.id] || []).map(function (r) {
+      var tgt = r.to === "T" ? u.root : u.partN(partNo(byId[r.to]));
+      return rname(r.type) + " " + tgt + (r.label ? (LANG === "zh" ? "：" : ": ") + bare(L(r.label)) : "");
+    }).join("\n");
+  }
+  function renderMap() {
+    var mm = $("mm"), u = UI[LANG], rels = (D.logic && D.logic.rels) || {};
+    mm.textContent = ""; mm.classList.toggle("guess", GUESS); document.body.classList.toggle("guess", GUESS);
+    document.querySelectorAll(".pstep button").forEach(function (b) { b.title = GUESS ? b.dataset.tipBare : b.dataset.tip; });
+    var ul = el("ul", "mm-parts");
+    D.parts.forEach(function (p) {
+      var rs = rels[p.id] || [], main = rs.filter(function (r) { return r.to === "T"; })[0] || rs[0];
+      var li = el("li", "mm-part" + (p.skip ? " skip" : "")); li.dataset.id = p.id; li.dataset.rel = main && !GUESS ? main.type : "";
+      var row = el("div", "mm-row"), b = btn("mm-node");
+      b.appendChild(el("span", "mm-n", p.skip ? "" : String(partNo(p)))); withNums(b.appendChild(el("span", "mm-t")), L(p.title));
+      var tip = [bare(L(p.title)), bare(L(p.claim)), p.claim_p ? u.jumpTo(p.claim_p) : ""]; if (!GUESS) tip.push(relTip(p));
+      b.title = tip.filter(Boolean).join("\n");
+      b.addEventListener("click", function () { jump(p.claim_p || rangeIds(p.range)[0]); });
+      row.appendChild(b); li.appendChild(row);
+      ul.appendChild(li);
+    });
+    mm.appendChild(ul);
+    $("guessbtn").textContent = GUESS ? u.reveal : u.guess; $("guessbtn").setAttribute("aria-pressed", GUESS ? "true" : "false");
+    layoutMap();
+  }
+  function layoutMap() {
+    var grid = $("mapgrid"), svg = grid.querySelector(".mm-lines"), NS = "http://www.w3.org/2000/svg";
+    if (!svg) { svg = document.createElementNS(NS, "svg"); svg.setAttribute("class", "mm-lines"); svg.setAttribute("aria-hidden", "true"); grid.insertBefore(svg, grid.firstChild); }
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    if (window.matchMedia("(max-width: 60rem)").matches) return;  // narrow: an indented list, the tree drawn by its rules
+    var g = grid.getBoundingClientRect(), th = $("thesis").getBoundingClientRect();
+    var xa = th.right - g.left + 12, ya = th.top - g.top + Math.min(th.height / 2, 60);
+    grid.querySelectorAll(".mm-part:not(.skip) > .mm-row").forEach(function (row) {
+      var r = row.getBoundingClientRect(), xb = r.left - g.left - 10, yb = r.top - g.top + r.height / 2, mx = (xa + xb) / 2;
+      var p = document.createElementNS(NS, "path");
+      p.setAttribute("d", "M" + xa + "," + ya + " C" + mx + "," + ya + " " + mx + "," + yb + " " + xb + "," + yb);
+      if (row.parentNode.dataset.rel === "qualifies") p.setAttribute("class", "dash");
+      svg.appendChild(p);
+    });
+  }
+  $("qs").addEventListener("toggle", layoutMap);
+  $("guessbtn").addEventListener("click", function () { GUESS = !GUESS; renderMap(); });
+  $("tocbtn").addEventListener("click", function () {
+    window.scrollTo({ top: $("mapsec").getBoundingClientRect().top + window.pageYOffset, behavior: reduce ? "auto" : "smooth" });
+    var first = $("mm").querySelector(".mm-node"); if (first) first.focus({ preventScroll: true });
+  });
+
+  function renderLookup() {
+    var body = $("lkbody"), u = UI[LANG], any = false; body.textContent = "";
+    D.parts.forEach(function (p) {
+      var rows = ALL.filter(function (x) { return x.part === p && (x.e.t === "def" || x.e.t === "assumption"); });
+      if (!rows.length) return; any = true;
+      body.appendChild(withNums(el("div", "lkgroup"), L(p.title)));
+      rows.forEach(function (x) {
+        var d = el("div", "lkitem");
+        if (x.e.term) withNums(d.appendChild(el("span", "lkterm")), L(x.e.term)); else d.appendChild(el("span", "lkterm", tname(x.e.t)));
+        withNums(d, L(x.e.x) || L(x.e.s));
+        d.appendChild(btn("linkbtn", idLabel(x.id), function () { $("lookup").close(); jump(x.id, x.i); }));
+        body.appendChild(d);
+      });
+    });
+    if (!any) body.appendChild(el("p", null, u.noTerms));
+  }
+  $("lkbtn").addEventListener("click", function () { var d = $("lookup"); if (d.showModal) d.showModal(); else d.setAttribute("open", ""); });
+  $("lkclose").addEventListener("click", function () { $("lookup").close(); });
+  $("lookup").addEventListener("click", function (e) { if (e.target === this) this.close(); });
+
+  function recallNode(p) {
+    var u = UI[LANG], det = el("details", "recall"), ol = el("ol");
+    det.appendChild(el("summary", null, u.recall + (LANG === "zh" ? "（" + p.recall.length + "）" : " (" + p.recall.length + ")")));
+    p.recall.forEach(function (q) {
+      var li = el("li"); li.appendChild(withNums(el("span"), L(q.q)));
+      var a = el("details"); a.appendChild(el("summary", null, u.answer)); a.appendChild(withNums(el("p"), L(q.a))); li.appendChild(a); ol.appendChild(li);
+    });
+    det.appendChild(ol); return det;
+  }
+  // the margin is the part's own guide: its steps (the one being read is marked) and the terms it defines first
+  function navInto(hd, p) {
+    var u = UI[LANG], fl = p.skip ? [] : (((D.logic && D.logic.flows) || {})[p.id] || []);
+    var defs = ALL.filter(function (x) { return x.part === p && x.e.t === "def" && L(x.e.term); });
+    if (!fl.length && !defs.length) return;
+    var d = el("details", "pnav-d"); d.appendChild(el("summary", null, u.structure));
+    function box(lab, list) { var b = el("div", "pbox"); b.appendChild(el("p", "plab", lab)); b.appendChild(list); d.appendChild(b); }
+    if (fl.length) {
+      var ol = el("ol", "psteps");
+      fl.forEach(function (s) {
+        var li = el("li", "pstep"), b = btn(null, null, function () { jump(s.p); });
+        li.dataset.rel = s.rel || ""; li.dataset.p = s.p; withNums(b, L(s.x));
+        b.dataset.tipBare = idLabel(s.p) + "　" + bare(L(s.x));
+        b.dataset.tip = idLabel(s.p) + "　" + (s.rel ? rname(s.rel) + (LANG === "zh" ? "：" : ": ") : "") + bare(L(s.x));
+        b.title = GUESS ? b.dataset.tipBare : b.dataset.tip;
+        li.appendChild(b); ol.appendChild(li);
+      });
+      box(u.structure, ol);
+    }
+    if (defs.length) {
+      var ul = el("ul", "pterms"), more = null, moreUl = null;
+      defs.forEach(function (x, k) {
+        var li = el("li"), b = btn("pterm", null, function () { jump(x.id, x.i); });
+        withNums(b.appendChild(el("b")), L(x.e.term)); withNums(b, L(x.e.x) || L(x.e.s));
+        b.title = bare(L(x.e.term)) + (LANG === "zh" ? "：" : ": ") + bare(L(x.e.x) || L(x.e.s));
+        li.appendChild(b);
+        if (k < 4) { ul.appendChild(li); return; }
+        if (!more) { more = el("details", "pmore"); more.appendChild(el("summary", null, u.more(defs.length - 4))); moreUl = el("ul", "pterms"); more.appendChild(moreUl); }
+        moreUl.appendChild(li);
+      });
+      if (more) { var mli = el("li"); mli.appendChild(more); ul.appendChild(mli); }
+      box(u.lookup, ul);
+    }
+    d.open = !NARROW.matches;
+    hd.appendChild(d);
+  }
+  var NARROW = window.matchMedia("(max-width: 60rem)");
+  function syncNav() { document.querySelectorAll(".pnav-d").forEach(function (d) { d.open = !NARROW.matches; }); }
+  if (NARROW.addEventListener) NARROW.addEventListener("change", syncNav);
+  function markStep() {
+    var line = $("bar").getBoundingClientRect().bottom + window.innerHeight * 0.25, cur = null;
+    document.querySelectorAll(".para").forEach(function (a) { if (a.id[0] === "P" && a.getBoundingClientRect().top < line) cur = a.id; });
+    var part = cur ? partOf(cur) : null, n = cur ? pnum(cur) : 0, hd = part ? $("part-" + part.id) : null, best = null;
+    if (hd) hd.querySelectorAll(".pstep").forEach(function (li) { if (pnum(li.dataset.p) <= n) best = li; });
+    document.querySelectorAll(".pstep.on").forEach(function (li) { if (li !== best) { li.classList.remove("on"); li.firstChild.removeAttribute("aria-current"); } });
+    if (best && !best.classList.contains("on")) { best.classList.add("on"); best.firstChild.setAttribute("aria-current", "step"); }
+  }
+  function renderStream() {
+    var s = $("stream"), body = null;
+    s.textContent = "";
+    var starts = {}, ends = {}; D.parts.forEach(function (p) { var ids = rangeIds(p.range); starts[ids[0]] = p; ends[ids[ids.length - 1]] = p; });
+    function open(p) {
+      var sec = el("section", "part");
+      if (p) {
+        var hd = el("div", "phead"), bx = el("div", "pbox"), t = el("h2", "ptitle"); hd.id = "part-" + p.id;
+        if (!p.skip) bx.appendChild(el("p", "plab", UI[LANG].partN(partNo(p))));
+        withNums(t, L(p.title)); bx.appendChild(t);
+        if (p.claim) bx.appendChild(withNums(el("p", "pclaim"), L(p.claim)));
+        hd.appendChild(bx);
+        navInto(hd, p);
+        sec.appendChild(hd);
+      }
+      body = el("div", "pbody"); sec.appendChild(body); s.appendChild(sec);
+    }
+    var heads = [];  // a section heading waits for the next item, so it opens the part that paragraph starts
+    D.order.forEach(function (id) {
+      var it = D.items[id];
+      if (it.type === "heading") { if (it.level > 0) heads.push(withMath(el("h3", "ahead"), it.text)); return; }
+      if (it.type !== "para" && !(it.type === "caption" && !(D.figs[id] && D.figs[id].host))) return;
+      if (it.type === "para" && starts[id]) open(starts[id]);
+      if (!body) open(null);
+      heads.forEach(function (h) { body.appendChild(h); }); heads = [];
+      if (it.type === "caption") { body.appendChild(figNode(id)); return; }
+      body.appendChild(paraNode(id, false));
+      (it.notes || []).forEach(function (nid) { body.appendChild(paraNode(nid, true)); });
+      (hosted[id] || []).forEach(function (cid) { body.appendChild(figNode(cid)); });
+      if (ends[id] && ends[id].recall && ends[id].recall.length) body.appendChild(recallNode(ends[id]));
+    });
+    if (heads.length) { if (!body) open(null); heads.forEach(function (h) { body.appendChild(h); }); }
+  }
+  function setView(v) {
+    VIEW = v;
+    document.body.classList.toggle("v-gist", v === "gist");
+    document.querySelectorAll("#views button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.v === v ? "true" : "false"); });
+    document.querySelectorAll(".para.t-close").forEach(function (a) {
+      var nd = a.querySelector(":scope > .nd"), ow = a.querySelector(":scope > .ow");
+      if (ow) ow.open = v === "full" || !nd;
+      if (nd) nd.open = v === "gist";
+    });
+  }
+  function topVisible() {
+    var tb = $("bar").getBoundingClientRect().bottom, best = null;
+    document.querySelectorAll(".para").forEach(function (p) { if (!best && p.getBoundingClientRect().bottom > tb + 4) best = p.id; });
+    return best;
+  }
+  $("langbtn").addEventListener("click", function () {
+    var keep = window.pageYOffset > document.querySelector(".reading").offsetTop ? topVisible() : null;
+    var offset = keep ? $(keep).getBoundingClientRect().top : 0;
+    LANG = LANG === D.langs[0] ? D.langs[1] : D.langs[0];
+    renderAll();
+    if (keep) { var t = $(keep); window.scrollTo(0, t.getBoundingClientRect().top + window.pageYOffset - offset); }
+  });
+  var printState = null;
+  window.addEventListener("beforeprint", function () {
+    if (printState) return;
+    printState = [];
+    document.querySelectorAll("details.ow, details.nd").forEach(function (d) { printState.push([d, d.open]); d.open = true; });
+  });
+  window.addEventListener("afterprint", function () {
+    if (!printState) return;
+    printState.forEach(function (s) { s[0].open = s[1]; });
+    printState = null;
+  });
+  var rt = null;
+  window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(layoutMap, 120); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutMap);
+  function progress() {
+    var st = $("stream"), bar = $("progress"); if (!st || !bar) return;
+    var top = st.getBoundingClientRect().top + window.pageYOffset, h = st.offsetHeight - window.innerHeight;
+    var f = h > 0 ? (window.pageYOffset - top) / h : 1; bar.style.transform = "scaleX(" + Math.max(0, Math.min(1, f)) + ")";
+    markStep();
+  }
+  window.addEventListener("scroll", progress, { passive: true }); window.addEventListener("resize", progress);
+  function renderAll() { renderHeader(); renderMap(); renderLookup(); renderStream(); setView(VIEW); progress(); layoutMap(); }
+  renderAll();
+})();
+</script>
+</body>
+</html>

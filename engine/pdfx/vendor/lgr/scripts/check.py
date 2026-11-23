@@ -1,0 +1,592 @@
+#!/usr/bin/env python3
+"""Validate guide data. Fix every error; make a judgment call on each warning.
+
+Usage:
+  python check.py WORK/paragraphs.json WORK/guide.json [WORK/paras_*.json]
+"""
+import argparse
+import re
+import sys
+import unicodedata
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from common import (DENSITY, DENSITY_ALIASES, LANGS, TIER_ALIASES, TIERS, as_lang, compress,  # noqa: E402
+                    MONTH_NAMES, MONTH_NAME_RE,
+                    find_anchor, fmt_num, inline_math_spans, use_utf8, load_elements, load_guide, load_json, numbers_in,
+                    parse_range, pnum, source_numbers, suggest_anchor)
+import ko_rules  # noqa: E402  PATCH(pdfx): Korean notes
+
+DESCRIPTIVE = {
+    "zh": re.compile(r"^(本段|这段|该段|此段|作者在这段|作者在本段|介绍|描述|说明|讨论|定义|给出|提出|分析|总结|列出|阐述)"),
+    "en": re.compile(r"^(?:(?:this|the) (?:paragraph|section|passage)s?\b|(?:describes|discusses|introduces|explains|"
+                     r"presents|defines|outlines|summari[sz]es|lists|talks about)\b)", re.I),
+    "ko": ko_rules.DESCRIPTIVE,
+}
+ZH_STYLE = [
+    (re.compile(r"对[^，。；：]{1,20}进行"), "“对……进行……”: use a direct verb"),
+    (re.compile(r"值得注意的是|需要指出的是|不难发现|众所周知"), "filler opener"),
+    (re.compile(r"总而言之|总的来说|综上所述"), "summary filler"),
+    (re.compile(r"不仅[^。；]{0,30}而且"), "“不仅……而且……”"),
+    (re.compile(r"起到[^。，；]{0,12}作用"), "“起到……作用”: say what it does"),
+    (re.compile(r"深刻|精彩|巧妙|有力地|极具"), "evaluative adjective; the guide does not grade the authors"),
+]
+EN_STYLE = [
+    (re.compile(r"\b(?:it is worth noting|importantly|interestingly|notably)\b", re.I), "filler phrase"),
+    (re.compile(r"\b(?:brilliant|compelling|powerful|elegant|insightful)\b", re.I), "evaluative adjective"),
+]
+# AI-sounding constructions (method.md section 9a); applied to the fields the agent writes, never to anchors
+TELLS = [
+    (re.compile(r"(?<!并)不是[^。；！？\n]{1,30}而是|而不是|不只是|不仅仅是|并不是[^。；！？\n]{1,30}而是"),
+     "contrast “不是……而是……”: state what it is, drop the denial"),
+    (re.compile(r"\bnot (?:just|only|merely|simply)\b|\bnot (?:[\w'’-]+,? ){1,4}but\b"
+                r"|\b(?:it|this|that)(?:'s|’s| is) not\b[^.;!?]{1,40}[,;] ?(?:it|this|that)(?:'s|’s| is)\b", re.I),
+     "contrast “not X but Y”: state what it is, drop the denial"),
+    (re.compile(r"—| – "), "dash as a connector: use a comma, colon, full stop or brackets"),
+    (re.compile(r"\b(?:serves|stands) as\b", re.I), "“serves/stands as”: write “is”"),
+    ko_rules.TELL,
+]
+STYLE = {"zh": ZH_STYLE, "en": EN_STYLE, "ko": ko_rules.STYLE}
+LIMITS = {"role": {"zh": 16, "en": 60}, "read": {"zh": 90, "en": 240},
+          "claim": {"zh": 80, "en": 220}, "thesis": {"zh": 100, "en": 280}}
+SHORT_NOTE = {"zh": 40, "en": 25}
+for _k, _v in ko_rules.LIMITS.items():
+    LIMITS[_k]["ko"] = _v
+SHORT_NOTE["ko"] = ko_rules.SHORT_NOTE
+
+EXHIBIT_RE = re.compile(r"(?<![A-Za-z])(Tables?|Fig(?:ure)?s?\.?|Exhibits?|表|图)\s?(\d+)(?![\d.]\d)", re.I)
+NUMERIC_DATE_RE = re.compile(r"(?<!\d)(?:(?P<year_zh>\d{4})\s*\u5e74\s*(?P<month_zh>\d{1,2})\s*\u6708(?:\s*(?P<day_zh>\d{1,2})\s*\u65e5)?|(?P<year_iso>\d{4})-(?P<month_iso>\d{1,2})(?:-(?P<day_iso>\d{1,2}))?|(?P<month_slash>\d{1,2})/(?P<year_slash>\d{4}))(?!\d)")
+
+
+def _date_month_spans(note, source):
+    """Return numeric month spans whose numeric dates match a named source month nearby."""
+    spans = []
+    source_months = list(MONTH_NAME_RE.finditer(source))
+    for date in NUMERIC_DATE_RE.finditer(note):
+        month_group = next(name for name in ("month_zh", "month_iso", "month_slash") if date.group(name))
+        month_text = date.group(month_group)
+        year = date.group("year_zh") or date.group("year_iso") or date.group("year_slash")
+        day = date.group("day_zh") or date.group("day_iso")
+        month = int(month_text)
+        if not 1 <= month <= 12:
+            continue
+        for named in source_months:
+            key = named.group(1).lower()
+            month_value = MONTH_NAMES[key]
+            nearby = source[max(0, named.start() - 40):named.end() + 40]
+            if month_value == month and (year in nearby or (day and re.search(rf"(?<!\d){int(day)}(?!\d)", nearby))):
+                spans.append((date.start(month_group), date.end(month_group)))
+                break
+    return spans
+
+
+def _numbers_with_date_months(note, source):
+    chars = list(note)
+    for start, end in _date_month_spans(note, source):
+        chars[start:end] = " " * (end - start)
+    # Chinese century/decade expressions and English ordinal centuries express
+    # dates at a coarser granularity than their component numerals suggest.
+    decade_expr = re.compile(r"(?<!\d)(\d{1,3})\s*世纪\s*(\d{1,2})\s*年代")
+    century_expr = re.compile(r"(?<!\d)(\d{1,3})\s*世纪|(?<!\d)(\d{1,3})(?:st|nd|rd|th)\s+century\b", re.I)
+    years = [int(x) for x in re.findall(r"(?<!\d)(?:1\d{3}|20\d{2})(?!\d)", source)]
+    src_centuries = {y // 100 + 1 for y in years}
+    decade_tokens = set()
+    for m in re.finditer(r"(?<!\d)(\d{3})0s?\b|\b(sixties|seventies|eighties|nineties)\b", source, re.I):
+        if m.group(1):
+            decade_tokens.add(int(m.group(1) + "0"))
+        else:
+            decade_tokens.add({"sixties": 1960, "seventies": 1970, "eighties": 1980, "nineties": 1990}[m.group(2).lower()])
+    for m in decade_expr.finditer(note):
+        century, decade = map(int, m.groups())
+        year = (century - 1) * 100 + decade
+        supported = decade % 10 == 0 and (year in decade_tokens or any(year <= y < year + 10 for y in years))
+        if supported:
+            chars[m.start():m.end()] = " " * (m.end() - m.start())
+    for m in century_expr.finditer(note):
+        number = int(m.group(1) or m.group(2))
+        supported = number in src_centuries or re.search(rf"\b{number}(?:st|nd|rd|th)\s+century\b|(?<!\d){number}\s*世纪", source, re.I)
+        if supported:
+            start, end = (m.start(1), m.end(1)) if m.group(1) else (m.start(2), m.end(2))
+            chars[start:end] = " " * (end - start)
+    return numbers_in("".join(chars))
+PART_RELS = {"supports", "explains", "qualifies", "extends", "frames", "challenges", "answers", "concludes"}
+STEP_RELS = PART_RELS | {"rules out", "implies", "names", "raises"}  # zh characters / en words for a skim note on a long paragraph
+
+
+def note_containment(step, note):
+    """Broder shingle containment, using character trigrams for unspaced scripts.
+
+    Ignore punctuation/case. Require five trigram-length units of text, so shared
+    short terms alone cannot warn. Near-complete containment means the step is
+    copied; this is a warning about wording, not a semantic similarity verdict.
+    """
+    normalize = lambda t: "".join(c for c in unicodedata.normalize("NFKC", t).casefold() if c.isalnum())
+    a, b = normalize(step), normalize(note)
+    n = 3
+    if len(a) < 5 * n or len(b) < 5 * n:
+        return 0.0
+    shingles = {a[i:i+n] for i in range(len(a)-n+1)}
+    other = {b[i:i+n] for i in range(len(b)-n+1)}
+    return len(shingles & other) / len(shingles)
+
+
+def run_checks(doc, guide, density=None):
+    errors, warns = [], []
+    types = load_elements()
+    meta = guide.get("meta") or {}
+    langs = meta.get("notes_lang") or ["zh"]
+    if isinstance(langs, str):
+        langs = [langs]
+    if [x for x in langs if x not in LANGS]:
+        errors.append(f"meta.notes_lang may only contain {', '.join(LANGS)}; got {langs}")
+        langs = [x for x in langs if x in LANGS] or ["zh"]
+    primary = langs[0]
+    items = {i["id"]: i for i in doc["items"]}
+    equation_crops=[it for it in items.values() if it.get("type")=="frag" and it.get("equation")
+                    and it.get("bbox") and it["id"] in (doc.get("crops") or {})]
+    for it in items.values():
+        box=it.get("bbox")
+        cropped_equation = it.get("type")=="frag" and it.get("equation") and (
+            it["id"] in (doc.get("crops") or {}) or box and any(
+                crop["page"]==it["page"] and crop["bbox"][0]<=box[0] and crop["bbox"][1]<=box[1]
+                and crop["bbox"][2]>=box[2] and crop["bbox"][3]>=box[3] for crop in equation_crops))
+        own_text=it.get("text", "")+" "+" ".join(it.get("unmapped_text",[]))
+        if not cropped_equation and (it.get("unmapped_glyphs") or re.search(r"⟦cid:\d+⟧", own_text)):
+            warns.append(f"{it['id']}: unmapped PDF glyphs remain; the agent must check the original page or use MinerU")
+    pids = [i["id"] for i in doc["items"] if i["type"] == "para"]
+    n = len(pids)
+    entries = guide.get("paras") or {}
+
+    def need(where, value, field):
+        d = as_lang(value, primary)
+        for lang in langs:
+            if not d.get(lang, "").strip():
+                errors.append(f"{where}: {field} is missing ({lang})")
+        return d
+
+    def nums_ok(where, d, allowed, source_text=""):
+        for lang, txt in d.items():
+            if lang == "ko":
+                txt = ko_rules.normalize_numbers(txt)
+            extra = sorted(x for x in _numbers_with_date_months(txt, source_text) if x not in allowed)
+            if extra:
+                errors.append(f"{where} ({lang}): numbers not in the source text: {', '.join(fmt_num(x) for x in extra)}")
+
+    def tells(where, d):
+        for lang, txt in d.items():
+            for rx, msg in TELLS:
+                if rx.search(txt):
+                    warns.append(f"{where} ({lang}): {msg}")
+
+    def style(where, d, restating=True):
+        tells(where, d)
+        for lang, txt in d.items():
+            if restating and DESCRIPTIVE[lang].search(txt.strip()):
+                warns.append(f"{where} ({lang}) describes the paragraph instead of restating it: «{txt[:40]}»")
+            for rx, msg in STYLE.get(lang, EN_STYLE):
+                if rx.search(txt):
+                    warns.append(f"{where} ({lang}): {msg}")
+
+    def longer(where, d, key):
+        for lang, txt in d.items():
+            size = len(txt) if lang == "zh" else len(txt)
+            if size > LIMITS[key][lang]:
+                warns.append(f"{where} ({lang}): {key} is {size} characters; keep it under {LIMITS[key][lang]}")
+
+    if not str(meta.get("title", "")).strip():
+        errors.append("meta.title is missing")
+    whole_texts = [it["text"] for it in doc["items"] if it["type"] in ("para", "note", "caption", "heading", "frag")]
+    whole = set().union(*map(source_numbers, whole_texts))
+    whole_text = "\n".join(whole_texts)
+    if not str(meta.get("purpose", "")).strip():
+        warns.append("meta.purpose is missing: ask the reader what they read for before writing (SKILL.md, step 0)")
+    questions = guide.get("questions")
+    if questions is not None:
+        if not isinstance(questions, list) or any(not isinstance(q, dict) or not q.get("q") or not q.get("a") for q in questions):
+            errors.append("questions must be a list of objects with 'q' (the reader's question), 'a' (the answer) and 'p' (paragraph ids)")
+            questions = []
+    thesis = need("guide", guide.get("thesis"), "thesis")
+    overview = need("guide", guide.get("overview"), "overview")
+    nums_ok("thesis", thesis, whole, whole_text)
+    nums_ok("overview", overview, whole, whole_text)
+    tells("thesis", thesis)
+    tells("overview", overview)
+    longer("thesis", thesis, "thesis")
+
+    # text that belongs to a paragraph's region: table rows, figure labels and captions up to the next paragraph
+    # and a labelled table or figure ("Table 3", "图 2"): its caption and the rows after it, for any paragraph that cites it
+    region, labelled, cur, label = {}, {}, None, None
+    for it in doc["items"]:
+        if it["type"] == "para":
+            cur, label = it["id"], None
+        elif it["type"] in ("frag", "caption"):
+            if cur:
+                region.setdefault(cur, []).append(it["text"])
+            if it["type"] == "caption":
+                m = EXHIBIT_RE.match(it["text"])
+                label = (m.group(1)[0].lower(), m.group(2)) if m else None
+            if label:
+                labelled.setdefault(label, []).append(it["text"])
+
+    def scope_texts(ids):
+        out = []
+        for i in ids:
+            it = items.get(i)
+            if it:
+                out.append(it["text"])
+                for nid in it.get("notes", []):
+                    out.append(items[nid]["text"])
+                out.extend(region.get(i, []))
+                for m in EXHIBIT_RE.finditer(it["text"]):
+                    out.extend(labelled.get((m.group(1)[0].lower(), m.group(2)), []))
+        return out
+
+    def text_scope(ids):
+        return "\n".join(scope_texts(ids))
+
+    def text_nums(ids):
+        return set().union(*map(source_numbers, scope_texts(ids)))
+
+    def part_source(ids):
+        selected = [items[i] for i in ids if i in items]
+        texts = [it["text"] for it in selected]
+        texts += [items[nid]["text"] for it in selected for nid in it.get("notes", [])]
+        positions = [index for index, it in enumerate(doc["items"]) if it["id"] in ids]
+        if positions:
+            end = max(positions) + 1
+            while end < len(doc["items"]) and doc["items"][end]["type"] in ("frag", "caption"):
+                end += 1  # a table or display that follows the part's last paragraph
+            texts += [it["text"] for it in doc["items"][min(positions):end]
+                      if it["type"] in ("frag", "caption")]
+        return set().union(*map(source_numbers, texts)), "\n".join(texts)
+
+    for k, q in enumerate(questions or []):
+        ids = q.get("p") or []
+        if not isinstance(ids, list) or not ids:
+            errors.append(f"question {k + 1}: 'p' must list the paragraph ids that answer it")
+            ids = []
+        bad = [i for i in ids if i not in items or items[i]["type"] not in ("para", "note")]
+        if bad:
+            errors.append(f"question {k + 1}: 'p' names ids that are not paragraphs: {', '.join(bad)}")
+        for f in ("q", "a"):
+            nums_ok(f"question {k + 1} {f}", need(f"question {k + 1}", q[f], f), text_nums([i for i in ids if i not in bad]), text_scope([i for i in ids if i not in bad]))
+
+    # parts: cover P1..Pn in order
+    parts = guide.get("parts") or []
+    if not parts:
+        errors.append("parts is missing")
+    pos, seen, part_of = 1, set(), {}
+    for p in parts:
+        pid = p.get("id") or "?"
+        if pid in seen:
+            errors.append(f"duplicate part id {pid}")
+        seen.add(pid)
+        try:
+            a, b = parse_range(p.get("range", ""))
+        except ValueError as e:
+            errors.append(f"{pid}: {e}")
+            continue
+        if a != pos:
+            errors.append(f"{pid} starts at P{a}; parts must cover P1-P{n} in order, so it should start at P{pos}")
+        pos = b + 1
+        ids = [f"P{i}" for i in range(a, b + 1)]
+        for i in ids:
+            part_of[i] = p
+        part_nums, part_text = part_source(ids)
+        need(pid, p.get("title"), "title")
+        need(pid, p.get("role"), "role")
+        if not p.get("skip"):
+            claim = need(pid, p.get("claim"), "claim")
+            longer(f"{pid} claim", claim, "claim")
+            tells(f"{pid} claim", claim)
+            nums_ok(f"{pid} claim", claim, part_nums, part_text)
+            cp = pnum(p.get("claim_p"))
+            if cp is None or not a <= cp <= b:
+                errors.append(f"{pid}: claim_p must name a paragraph inside {p.get('range')}")
+            recall = p.get("recall")
+            if recall is None:
+                warns.append(f"{pid}: no 'recall' questions; two or three per part let the reader test themselves (method.md section 12)")
+            elif not isinstance(recall, list) or not recall or any(not isinstance(q, dict) or not q.get("q") or not q.get("a") for q in recall):
+                errors.append(f"{pid}: recall must be a list of objects with 'q' (question) and 'a' (answer)")
+            else:
+                for k, q in enumerate(recall):
+                    for f in ("q", "a"):
+                        rd = need(f"{pid} recall {k + 1}", q[f], f)
+                        nums_ok(f"{pid} recall {k + 1} {f}", rd, part_nums, part_text)
+                        tells(f"{pid} recall {k + 1} {f}", rd)
+    if parts and pos - 1 != n:
+        errors.append(f"parts end at P{pos - 1}; they must end at P{n}")
+
+    # logic map: relations between parts, and the steps inside each part
+    live = {p.get("id"): p for p in parts if not p.get("skip")}
+    with_rel = [p for p in live.values() if p.get("rel")]
+    if with_rel:
+        concl = [p for p in live.values() if (p.get("rel") or [{}])[0].get("type") == "concludes"]
+        if len(concl) > 1:
+            warns.append(f"more than one part concludes: {', '.join(p['id'] for p in concl)}; the map shows the first")
+        for pid, p in live.items():
+            rels = p.get("rel") or []
+            if not rels:
+                errors.append(f"{pid}: needs 'rel' (what it does for the conclusion or for another part) once any part has one")
+                continue
+            for k, r in enumerate(rels):
+                if r.get("type") not in PART_RELS:
+                    errors.append(f"{pid} rel {k + 1}: type must be one of {', '.join(sorted(PART_RELS))}")
+                to = r.get("to")
+                if to != "T" and to not in live:
+                    errors.append(f"{pid} rel {k + 1}: 'to' must be T (the conclusion) or the id of a part that is not skipped")
+                if to == pid:
+                    errors.append(f"{pid} rel {k + 1}: a part cannot point to itself")
+                if r.get("label") is not None:
+                    try:
+                        a0, b0 = parse_range(p.get("range", ""))
+                        nums_ok(f"{pid} rel {k + 1} label", as_lang(r["label"], primary), text_nums([f"P{i}" for i in range(a0, b0 + 1)]), text_scope([f"P{i}" for i in range(a0, b0 + 1)]))
+                    except ValueError:
+                        pass
+        for pid in live:  # the first relation of every part must lead to the conclusion without a cycle
+            seen, cur = [], pid
+            while cur != "T":
+                if cur in seen or cur not in live or not live[cur].get("rel"):
+                    errors.append(f"{pid}: its first relations ({' -> '.join(map(str, seen + [cur]))}) do not lead to the conclusion T")
+                    break
+                seen.append(cur)
+                cur = live[cur]["rel"][0].get("to")
+    for pid, p in live.items():
+        flow = p.get("flow") or []
+        if not flow:
+            if with_rel:
+                warns.append(f"{pid}: no 'flow'; clicking it on the map shows no steps")
+            continue
+        try:
+            a0, b0 = parse_range(p.get("range", ""))
+        except ValueError:
+            continue
+        inside = {f"P{i}" for i in range(a0, b0 + 1)}
+        part_nums, part_text = part_source(inside)
+        inside |= {n for i in list(inside) for n in (items.get(i) or {}).get("notes", [])}
+        if not 2 <= len(flow) <= 7:
+            warns.append(f"{pid}: flow has {len(flow)} steps; 3 to 6 is usual")
+        for k, st in enumerate(flow):
+            if st.get("p") not in inside:
+                errors.append(f"{pid} flow step {k + 1}: 'p' must be a paragraph or footnote inside {p.get('range')}")
+            if k and st.get("rel") not in STEP_RELS:
+                errors.append(f"{pid} flow step {k + 1}: 'rel' must be one of {', '.join(sorted(STEP_RELS))}")
+            x = need(f"{pid} flow step {k + 1}", st.get("x"), "x")
+            nums_ok(f"{pid} flow step {k + 1}", x, part_nums, part_text)
+            tells(f"{pid} flow step {k + 1}", x)
+            note = as_lang((entries.get(st.get("p")) or {}).get("note"), primary)
+            for lang, text in x.items():
+                # 90% requires nearly all of the step's character trigrams to
+                # occur in its note. The 15-character minimum avoids warnings
+                # on short shared terms; punctuation and case edits still count.
+                if note_containment(text, note.get(lang, "")) >= 0.9:
+                    warns.append(f"{pid} flow step {k + 1} ({lang}): largely repeats {st.get('p')}'s note; give the reasoning move without restating the note (method.md section 10)")
+
+    missing = [pnum(p) for p in pids if p not in entries]
+    if missing:
+        errors.append(f"no guide entry for {compress(missing)}")
+    unknown = [k for k in entries if k not in items or items[k]["type"] not in ("para", "note")]
+    if unknown:
+        errors.append(f"guide entries for ids that are not paragraphs or footnotes: {', '.join(unknown[:20])}")
+
+    hl, counts, mapped = {}, {t: 0 for t in TIERS}, set()
+    for eid, g in entries.items():
+        it = items.get(eid)
+        if not it or it["type"] not in ("para", "note") or not isinstance(g, dict):
+            continue
+        tier = TIER_ALIASES.get(g.get("tier"), g.get("tier"))
+        if tier not in TIERS:
+            errors.append(f"{eid}: tier must be close, skim or skip")
+            continue
+        g["tier"] = tier
+        if it["type"] == "para":
+            counts[tier] += 1
+        role = need(eid, g.get("role"), "role")
+        longer(f"{eid} role", role, "role")
+        base = [eid] if it["type"] == "para" else [it.get("ref") or eid]
+        k = pnum(base[0])
+        neighbours = [f"P{k - 1}", f"P{k + 1}"] if k else []
+        allowed = text_nums(base + neighbours) | source_numbers(it["text"])
+        if tier == "close":
+            d = need(eid, g.get("read"), "read")
+            longer(f"{eid} read", d, "read")
+            if g.get("note") is None or not any(as_lang(g.get("note"), primary).values()):
+                warns.append(f"{eid}: close read has no 'note' (the after-reading summary); add one so a reader who only has the page gets the argument (method.md section 4)")
+            else:
+                cn = need(eid, g.get("note"), "note")
+                nums_ok(f"{eid} note", cn, allowed, text_scope(base + neighbours))
+                style(f"{eid} note", cn)
+        else:
+            d = need(eid, g.get("note"), "note")
+            if tier == "skim" and len(it["text"]) >= 600:
+                for lang, txt in d.items():
+                    size = len(txt) if lang in ("zh", "ko") else len(txt.split())
+                    if size < SHORT_NOTE[lang]:
+                        warns.append(f"{eid} ({lang}): the note is short for a {len(it['text'])}-character paragraph; "
+                                     f"a skim note should let the reader move on without the original")
+            if tier == "skip":
+                why = need(eid, g.get("why"), "why")
+                nums_ok(f"{eid} why", why, allowed, text_scope(base + neighbours))
+        nums_ok(f"{eid} {'read' if tier == 'close' else 'note'}", d, allowed, text_scope(base + neighbours))
+        style(f"{eid} {'read' if tier == 'close' else 'note'}", d, restating=tier != "close")
+        spans = []
+        for i, e in enumerate(g.get("els") or []):
+            t = e.get("t")
+            if t not in types:
+                errors.append(f"{eid} element {i + 1}: unknown type {t!r} (see references/elements.md)")
+                continue
+            a = str(e.get("a", "")).strip()
+            if types[t]["level"] >= 2 and not a:
+                errors.append(f"{eid} element {i + 1} ({t}): needs an anchor 'a' copied verbatim from the paragraph")
+            if a:
+                found = find_anchor(it["text"], a)
+                if found is None:
+                    errors.append(f"{eid} element {i + 1}: anchor not found in the original: «{a[:70]}»\n"
+                                  f"      closest sentence: «{suggest_anchor(it['text'], a)}»")
+                else:
+                    spans.append((found[0], found[1], i))
+            for f in ("s", "x", "term"):
+                if e.get(f) is not None:
+                    nums_ok(f"{eid} element {i + 1} {f}", as_lang(e.get(f), primary), allowed, text_scope(base + neighbours))
+                    tells(f"{eid} element {i + 1} {f}", as_lang(e.get(f), primary))
+            if t == "formula":
+                if "tex" in e and not str(e.get("tex") or "").strip():
+                    errors.append(f"{eid} element {i + 1}: tex is empty; write the LaTeX or drop the field")
+                elif e.get("tex"):
+                    tex = str(e["tex"])
+                    depth = 0
+                    for ch in re.sub(r"\\\\|\\[{}]", "", tex):  # "\\" is a line break; "\{" is a literal brace
+                        depth += ch == "{"
+                        depth -= ch == "}"
+                        if depth < 0:
+                            break
+                    if depth != 0:
+                        errors.append(f"{eid} element {i + 1}: tex has unbalanced braces: «{tex[:60]}»")
+                    # numbers in the formula must come from the source; sub- and superscripts are notation
+                    plain = re.sub(r"[_^]\s*(?:\{[^{}]*\}|\S)", " ", tex)
+                    extra = sorted(x for x in numbers_in(plain) if x not in allowed)
+                    if extra:
+                        warns.append(f"{eid} element {i + 1} tex: numbers not in the source text: "
+                                     f"{', '.join(fmt_num(x) for x in extra)}; check the transcription against the crop")
+                elif not e.get("tex"):
+                    warns.append(f"{eid} element {i + 1}: formula without tex; transcribe it from WORK/crops/ or the open version")
+                syms = e.get("syms")
+                if syms is not None:
+                    if not isinstance(syms, list) or any(not isinstance(y, dict) or not y.get("s") or not y.get("m") for y in syms):
+                        errors.append(f"{eid} element {i + 1}: syms must be a list of objects with 's' (symbol) and 'm' (meaning)")
+                    else:
+                        for k, y in enumerate(syms):
+                            nums_ok(f"{eid} element {i + 1} sym {k + 1}", as_lang(y["m"], primary), allowed, text_scope(base + neighbours))
+                if e.get("why") is not None:
+                    nums_ok(f"{eid} element {i + 1} why", as_lang(e["why"], primary), allowed, text_scope(base + neighbours))
+            if e.get("s") is not None:
+                need(f"{eid} element {i + 1}", e.get("s"), "s")
+                mapped.add(eid if it["type"] == "para" else it.get("ref"))
+            if t == "def" and not e.get("term"):
+                warns.append(f"{eid} element {i + 1}: a definition should name its term in 'term'")
+        spans.sort()
+        if len(spans) > 4:
+            warns.append(f"{eid}: {len(spans)} highlights; more than four in one paragraph stops being a signal (keep two to four)")
+        for (s1, e1, i1), (s2, e2, i2) in zip(spans, spans[1:]):
+            if s2 < e1:
+                warns.append(f"{eid}: anchors of elements {i1 + 1} and {i2 + 1} overlap; only the first is highlighted")
+        hl[eid] = spans
+
+    role_count, role_text = {}, {}
+    for eid, g in entries.items():
+        if isinstance(g, dict) and items.get(eid, {}).get("type") == "para":
+            for lang, txt in as_lang(g.get("role"), primary).items():
+                key = (lang, txt.strip().lower())
+                role_count.setdefault(key, []).append(eid)
+                role_text.setdefault(key, txt.strip())
+    for key, ids in sorted(role_count.items(), key=lambda kv: -len(kv[1])):
+        lang, txt = key
+        if len(ids) >= 4 and txt:
+            warns.append(f"{len(ids)} paragraphs ({compress([pnum(i) for i in ids])}) carry the same role «{role_text[key]}» ({lang}); "
+                         f"a role says what that paragraph does (\"Experiment 2 results\"), not its kind")
+    for p in parts:
+        if p.get("skip") or "_skip" in p:
+            continue
+        try:
+            a, b = parse_range(p.get("range", ""))
+        except ValueError:
+            continue
+        if not any(f"P{i}" in mapped for i in range(a, b + 1)):
+            warns.append(f"{p.get('id')}: no element has a map label 's', so this part shows only its claim on the map")
+
+    dens = DENSITY_ALIASES.get(density or meta.get("density") or "medium", density or meta.get("density") or "medium")
+    cap = DENSITY.get(dens)
+    if cap is None:
+        warns.append(f"meta.density should be low, medium or high; got {dens!r}, using medium")
+        dens, cap = "medium", DENSITY["medium"]
+    if n and counts["close"] / n > cap + 1e-9:
+        warns.append(f"{counts['close']} close reads = {counts['close'] / n:.0%} of paragraphs, above the {dens} cap of {cap:.0%}")
+    if n and counts["close"] == 0:
+        warns.append("no close-read paragraphs")
+    stats = {"n": n, "counts": counts, "density": dens, "langs": langs, "parts": len(parts)}
+    # JSON escapes that eat a LaTeX backslash: "\beta" -> backspace, "\frac" -> form feed, "\theta" -> tab, ...
+    def eaten(where, v, key=None):
+        if isinstance(v, dict):
+            for k, x in v.items():
+                eaten(f"{where}.{k}" if where else str(k), x, k)
+        elif isinstance(v, list):
+            for k, x in enumerate(v):
+                eaten(f"{where}[{k + 1}]", x, key)
+        elif isinstance(v, str):
+            fix = "write a double backslash in the JSON, e.g. \"\\\\beta\" for \\beta"
+            if "\x08" in v or "\x0c" in v:
+                errors.append(f"{where}: contains a backspace/form-feed character, so a LaTeX backslash was eaten by JSON "
+                              f"(\\b -> backspace, \\f -> form feed); {fix}: «{v[:50]!r}»")
+            else:  # a tab/newline/return before a letter is often legitimate, so only inside maths and only a warning
+                # money ("$500") is not a maths span; a tab right after the opening $ is a span whose first backslash was eaten,
+                # and a newline breaks inline_math_spans, so "$r_i \neq r_j$" written with one backslash is found separately
+                spans = [v] if key == "tex" else ([m.group(1) for m in inline_math_spans(v)]
+                                                  + re.findall(r"\$([\t\n\r][^$]*)\$", v)
+                                                  + re.findall(r"\$(?![\s$\d])([^$]*[\t\n\r][a-z][^$]*)(?<!\s)\$", v))
+                if any(re.search(r"[\t\n\r][a-z]", x) for x in spans):
+                    warns.append(f"{where}: a tab/newline/return is followed by a letter inside maths, perhaps \\theta, \\nu or \\rho eaten by JSON "
+                                 f"(\\t, \\n, \\r); {fix}: «{v[:50]!r}»")
+    eaten("", guide)
+
+    return errors, warns, {"hl": hl, "stats": stats, "primary": primary}
+
+
+def report(errors, warns, computed):
+    st = computed["stats"]
+    n, c = st["n"], st["counts"]
+    share = f"{c['close'] / n:.0%}" if n else "-"
+    print(f"{n} paragraphs: {c['close']} close ({share}), {c['skim']} skim, {c['skip']} skip; "
+          f"{st['parts']} parts; notes in {'+'.join(st['langs'])}; density {st['density']}")
+    print(f"{len(errors)} errors" + (":" if errors else ""))
+    for e in errors:
+        print(f"  - {e}")
+    print(f"{len(warns)} warnings" + (":" if warns else ""))
+    for w in warns:
+        print(f"  - {w}")
+
+
+def stale_fixes(paragraphs):
+    path = Path(paragraphs)
+    fixes = path.with_name("fixes.json")
+    if path.with_name("fixes_log.json").exists() and fixes.exists() and path.stat().st_mtime_ns < fixes.stat().st_mtime_ns:
+        return "fixes.json was edited but not applied; run fix.py apply before writing guide data"
+    return None
+
+
+def main():
+    use_utf8()
+    ap = argparse.ArgumentParser(description="Validate guide data")
+    ap.add_argument("paragraphs")
+    ap.add_argument("guide", nargs="+")
+    ap.add_argument("--density", choices=list(DENSITY))
+    args = ap.parse_args()
+    errors, warns, computed = run_checks(load_json(args.paragraphs), load_guide(args.guide), args.density)
+    stale = stale_fixes(args.paragraphs)
+    if stale:
+        warns.append(stale)
+    report(errors, warns, computed)
+    sys.exit(1 if errors else 0)
+
+
+if __name__ == "__main__":
+    main()

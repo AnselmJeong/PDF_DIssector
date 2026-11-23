@@ -1,0 +1,270 @@
+import json
+from types import SimpleNamespace
+import pytest
+import render as r
+from check import run_checks
+
+@pytest.mark.parametrize('text,key',[('Figure 2. Test',['fig',2]),('表 3 示例',['table',3]),('body',None)])
+def test_cap_key(text,key): assert r.cap_key(text)==key
+
+def test_mentions(): assert r.mentions('Figure 2 and Table 3; 图4 表5')==[['fig',2],['table',3],['fig',4],['table',5]]
+
+def test_build(clean):
+    doc,g=clean
+    doc['items'][0]['text'] += ' Figure 1 shows choices.'
+    doc['items'][1]['text'] += ' Figure 1 repeats choices.'
+    doc['items'].insert(1,{'id':'C1','type':'caption','text':'Figure 1. Choices','page':2})
+    doc['items'].insert(2,{'id':'F1','type':'frag','text':'10 20','page':2,'table':True})
+    _,_,comp=run_checks(doc,g)
+    d=r.build_data(doc,g,comp,None,{},None)
+    assert d['figs']['C1']['host']=='P1' and d['table_pages']=={'P1':2}
+    assert d['logic']['rels']['A']==g['parts'][0]['rel']
+    assert d['logic']['flows']['A'][0]['x']=={'en':'Buyers choose.'}
+
+def test_roundtrip(clean,tmp_path):
+    doc,g=clean
+    args=SimpleNamespace(density=None,force=False,sources=None,no_page_images=True,pdf=None,lang=None)
+    a,b=tmp_path/'a.html',tmp_path/'b.html'
+    r.render(doc,g,a,args)
+    r.dump(a,tmp_path/'dump')
+    r.render(json.loads((tmp_path/'dump/paragraphs.json').read_text(encoding='utf-8')),json.loads((tmp_path/'dump/guide.json').read_text(encoding='utf-8')),b,args)
+    assert json.loads(r.DATA_RE.search(a.read_text(encoding='utf-8')).group(1)) == json.loads(r.DATA_RE.search(b.read_text(encoding='utf-8')).group(1))
+
+
+def _with_formula(clean, bbox=True):
+    doc, g = clean
+    doc['items'][0]['text'] = 'The share is s = 3 / 5, so three in five buyers chose it.'
+    if bbox:
+        doc['items'][0]['bbox'] = [0.1, 0.1, 0.9, 0.2]
+    g['paras']['P1']['els'] = [{'t': 'formula', 'a': 's = 3 / 5', 'tex': 's = \\frac{3}{5}', 'syms': [{'s': 's', 'm': 'share'}], 'x': 'three in five', 'why': 'baseline'}]
+    return doc, g
+
+
+def test_build_formula_fields_and_flags(clean):
+    doc, g = _with_formula(clean)
+    _, _, comp = run_checks(doc, g)
+    d = r.build_data(doc, g, comp, None, {}, None, crops={'P1': 'data:image/png;base64,AAAA'})
+    e = d['guide']['P1']['els'][0]
+    assert e['tex'] == 's = \\frac{3}{5}' and e['syms'] == [{'s': 's', 'm': {'en': 'share'}}] and e['why'] == {'en': 'baseline'}
+    assert d['has_tex'] is True and d['crops'] == {'P1': 'data:image/png;base64,AAAA'}
+
+
+def test_build_formula_without_bbox(clean):
+    doc, g = _with_formula(clean, bbox=False)
+    _, _, comp = run_checks(doc, g)
+    d = r.build_data(doc, g, comp, None, {}, None)
+    assert d['has_tex'] is True and d['crops'] == {}
+
+
+def test_render_inlines_katex_only_with_tex(clean, tmp_path):
+    args = SimpleNamespace(density=None, force=False, sources=None, no_page_images=True, pdf=None, lang=None)
+    doc, g = clean
+    r.render(doc, g, tmp_path / 'plain.html', args)
+    plain = (tmp_path / 'plain.html').read_text(encoding='utf-8')
+    assert 'data:font/woff2' not in plain and '__KATEX__' not in plain and 'function(e,t)' not in plain
+    doc, g = _with_formula(clean, bbox=False)
+    r.render(doc, g, tmp_path / 'math.html', args)
+    html = (tmp_path / 'math.html').read_text(encoding='utf-8')
+    assert 'KaTeX' in html and 'data:font/woff2' in html and '__KATEX__' not in html
+
+
+def test_roundtrip_tex(clean, tmp_path):
+    args = SimpleNamespace(density=None, force=False, sources=None, no_page_images=True, pdf=None, lang=None)
+    doc, g = _with_formula(clean, bbox=False)
+    g['paras']['P1']['els'][0]['tex'] = 'a </script> \\\\ b'
+    a, b = tmp_path / 'a.html', tmp_path / 'b.html'
+    r.render(doc, g, a, args)
+    r.dump(a, tmp_path / 'dump')
+    r.render(json.loads((tmp_path / 'dump/paragraphs.json').read_text(encoding='utf-8')), json.loads((tmp_path / 'dump/guide.json').read_text(encoding='utf-8')), b, args)
+    assert json.loads(r.DATA_RE.search(a.read_text(encoding='utf-8')).group(1)) == json.loads(r.DATA_RE.search(b.read_text(encoding='utf-8')).group(1))
+
+
+def test_roundtrip_crops(clean, tmp_path):
+    args = SimpleNamespace(density=None, force=False, sources=None, no_page_images=True, pdf=None, lang=None)
+    doc, g = _with_formula(clean)
+    work = tmp_path / 'work'; (work / 'crops').mkdir(parents=True)
+    png = b'\x89PNG\r\n\x1a\n' + b'0' * 20
+    (work / 'crops' / 'P1.png').write_bytes(png)
+    doc['crops'] = {'P1': 'crops/P1.png'}
+    a = tmp_path / 'a.html'
+    r.render(doc, g, a, args, work_dir=work)
+    r.dump(a, tmp_path / 'dump')
+    d2 = json.loads((tmp_path / 'dump/paragraphs.json').read_text(encoding='utf-8'))
+    assert d2['crops'] == {'P1': 'crops/P1.png'} and (tmp_path / 'dump/crops/P1.png').read_bytes() == png
+    b = tmp_path / 'b.html'
+    r.render(d2, json.loads((tmp_path / 'dump/guide.json').read_text(encoding='utf-8')), b, args, work_dir=tmp_path / 'dump')
+    assert json.loads(r.DATA_RE.search(a.read_text(encoding='utf-8')).group(1))['crops'] == json.loads(r.DATA_RE.search(b.read_text(encoding='utf-8')).group(1))['crops']
+
+
+def test_table_crop_attaches_to_citing_paragraph(clean):
+    doc, g = clean
+    doc['items'][0]['text'] += ' Table 1 lists the choices.'
+    doc['items'].insert(2, {'id': 'C1', 'type': 'caption', 'text': 'Table 1. Choices', 'page': 1})
+    doc['items'].insert(3, {'id': 'F1', 'type': 'frag', 'text': '10 20', 'page': 1, 'table': True, 'bbox': [0.1, 0.1, 0.9, 0.2]})
+    _, _, comp = run_checks(doc, g)
+    d = r.build_data(doc, g, comp, None, {}, None, crops={'F1': 'data:image/png;base64,AAAA'})
+    assert d['frag_crops'] == {'P1': ['F1']}
+
+
+def test_figure_images_above_their_captions_attach_to_citing_paragraphs(clean):
+    doc, g = clean
+    doc['items'][0]['text'] += ' Figure 1 shows the trend.'
+    doc['items'][1]['text'] += ' The map is in Figure 2a.'
+    image = {'type': 'frag', 'text': '', 'page': 2, 'figure': True, 'region_crop': True, 'embedded_image': True,
+             'bbox': [0.1, 0.1, 0.9, 0.4]}
+    doc['items'] += [dict(image, id='F1'), {'id': 'C1', 'type': 'caption', 'text': 'Figure 1: Trend', 'page': 2},
+                     dict(image, id='F2', page=3), {'id': 'C2', 'type': 'caption', 'text': 'Figure 2: Maps', 'page': 3}]
+    _, _, comp = run_checks(doc, g)
+    d = r.build_data(doc, g, comp, None, {}, None, crops={'F1': 'data:image/png;base64,AAAA', 'F2': 'data:image/png;base64,AAAA'})
+    assert d['frag_crops'] == {'P1': ['F1'], 'P2': ['F2']}
+    assert r.mentions('Figure 2a and Table 3') == [['fig', 2], ['table', 3]]
+
+
+def test_katex_placeholder_in_text_does_not_break_page(clean, tmp_path):
+    args = SimpleNamespace(density=None, force=False, sources=None, no_page_images=True, pdf=None, lang=None)
+    doc, g = _with_formula(clean, bbox=False)
+    doc['items'][1]['text'] = 'A paragraph that literally says __KATEX__ and __DATA__.'
+    g['paras']['P2']['note'] = 'Says __KATEX__.'
+    out = tmp_path / 'k.html'
+    r.render(doc, g, out, args)
+    html = out.read_text(encoding='utf-8')
+    assert html.count('<script id="guide-data"') == 1
+    assert json.loads(r.DATA_RE.search(html).group(1))['items']['P2']['text'].endswith('__DATA__.')
+
+
+def test_build_recall_and_glossary(clean):
+    doc, g = clean
+    g['parts'][0]['recall'] = [{'q': 'Who chose?', 'a': 'Three buyers.'}]
+    g['paras']['P1']['els'] = [{'t': 'def', 'term': 'reward', 'a': 'smaller reward', 'x': 'the payment offered'},
+                               {'t': 'formula', 'a': 'Three buyers', 'tex': 's = 1', 'syms': [{'s': 'share', 'm': 'the fraction'}]}]
+    _, _, comp = run_checks(doc, g)
+    d = r.build_data(doc, g, comp, None, {}, None)
+    assert d['parts'][0]['recall'] == [{'q': {'en': 'Who chose?'}, 'a': {'en': 'Three buyers.'}}]
+    assert {'term': 'reward', 'x': {'en': 'the payment offered'}, 'src': 'P1'} in d['glossary']
+    assert {'term': 'share', 'x': {'en': 'the fraction'}, 'src': 'P1'} in d['glossary']
+
+
+def test_bilingual_glossary_term_gives_one_entry_per_spelling(clean):
+    # a def element whose term is {"en": ..., "zh": ...} used to reach the page as the string "{'en': ...}"
+    doc, g = clean
+    g['meta']['notes_lang'] = ['en', 'zh']
+    g['paras']['P1']['els'] = [{'t': 'def', 'term': {'en': 'reward', 'zh': '报酬'}, 'a': 'smaller reward',
+                                'x': {'en': 'the payment offered', 'zh': '给出的报酬'}}]
+    _, _, comp = run_checks(doc, g)
+    d = r.build_data(doc, g, comp, None, {}, None)
+    terms = [e['term'] for e in d['glossary']]
+    assert 'reward' in terms and '报酬' in terms
+    assert not any(t.startswith('{') for t in terms)
+
+
+def test_roundtrip_recall(clean, tmp_path):
+    args = SimpleNamespace(density=None, force=False, sources=None, no_page_images=True, pdf=None, lang=None)
+    doc, g = clean
+    g['parts'][0]['recall'] = [{'q': 'Who chose?', 'a': 'Three buyers.'}]
+    a, b = tmp_path / 'a.html', tmp_path / 'b.html'
+    r.render(doc, g, a, args)
+    r.dump(a, tmp_path / 'dump')
+    assert json.loads((tmp_path / 'dump/guide.json').read_text(encoding='utf-8'))['parts'][0]['recall'][0]['q'] == {'en': 'Who chose?'}
+    r.render(json.loads((tmp_path / 'dump/paragraphs.json').read_text(encoding='utf-8')), json.loads((tmp_path / 'dump/guide.json').read_text(encoding='utf-8')), b, args)
+    assert json.loads(r.DATA_RE.search(a.read_text(encoding='utf-8')).group(1))['parts'] == json.loads(r.DATA_RE.search(b.read_text(encoding='utf-8')).group(1))['parts']
+
+
+def test_build_reader_brief(clean):
+    doc, g = clean
+    g['meta'].update({'purpose': 'core claims only', 'familiarity': 'new to the field'})
+    g['questions'] = [{'q': 'Do buyers prefer small rewards?', 'a': 'Yes.', 'p': ['P1']}]
+    _, _, comp = run_checks(doc, g)
+    d = r.build_data(doc, g, comp, None, {}, None)
+    assert d['meta']['purpose'] == {'en': 'core claims only'} and d['meta']['familiarity'] == {'en': 'new to the field'}
+    assert d['questions'] == [{'q': {'en': 'Do buyers prefer small rewards?'}, 'a': {'en': 'Yes.'}, 'p': ['P1']}]
+
+
+def test_crop_images_recompress_to_grayscale(tmp_path):
+    from PIL import Image
+    work = tmp_path; (work / 'crops').mkdir()
+    im = Image.new('RGB', (400, 120), 'white')
+    for x in range(0, 400, 3):
+        im.putpixel((x, 60), (20, 30, 40))
+    im.save(work / 'crops' / 'F1.png')
+    raw = (work / 'crops' / 'F1.png').read_bytes()
+    out = r.crop_images({'crops': {'F1': 'crops/F1.png'}}, work)
+    assert out['F1'].startswith('data:image/png;base64,')
+    assert len(out['F1']) < len(raw) * 4 / 3
+
+
+def test_inline_math_in_notes_inlines_katex(clean):
+    doc, g = clean
+    g['paras']['P2']['note'] = 'Two goods: $c_1 \\in C$ for shoes.'
+    _, _, comp = run_checks(doc, g)
+    assert r.build_data(doc, g, comp, None, {}, 'en')['has_tex'] is True
+    g['paras']['P2']['note'] = 'A salary of $50,000 against $60,000 expected.'
+    _, _, comp = run_checks(doc, g)
+    assert r.build_data(doc, g, comp, None, {}, 'en')['has_tex'] is False
+
+
+def test_cap_key_and_mentions_roman_numerals():
+    # An economics article: tables are numbered TABLE II ... TABLE XI; Roman numbers must resolve like Arabic ones
+    assert r.cap_key('TABLE III NONDEALER SUMMARY STATISTICS') == ['table', 3]
+    assert r.cap_key('FIGURE I Summary of Trading Results') == ['fig', 1]
+    assert r.mentions('Table II reports; see Table XI and Figure IV') == [['table', 2], ['table', 11], ['fig', 4]]
+    assert r.mentions('Table 3 and 图4') == [['table', 3], ['fig', 4]]
+
+
+def test_equation_crop_skips_label_only_paragraph(clean):
+    # An economics article: "(2a)" came out as its own paragraph between the introducing sentence and the equation crop
+    doc, g = clean
+    doc['items'][0]['text'] = 'The model is given by the following system:'
+    doc['items'].insert(1, {'id': 'P9', 'type': 'para', 'text': '(2a)', 'page': 1})
+    doc['items'].insert(2, {'id': 'F1', 'type': 'frag', 'text': '[equation]', 'page': 1, 'equation': True})
+    g['paras']['P9'] = {'tier': 'skip', 'role': 'label', 'note': 'label', 'why': 'label'}
+    g['parts'][0]['range'] = 'P1-P9'
+    _, _, comp = run_checks(doc, g)
+    d = r.build_data(doc, g, comp, None, {}, 'en', crops={'F1': 'data:image/png;base64,AAAA'})
+    assert d['frag_crops'] == {'P1': ['F1']}
+
+
+def test_page_has_no_source_path(clean,tmp_path):
+    doc,g=clean
+    doc['source_path']='C:/Users/someone/a.pdf'
+    args=SimpleNamespace(density=None,force=False,sources=None,no_page_images=True,pdf=None,lang=None)
+    out=tmp_path/'o.html'
+    r.render(doc,g,out,args)
+    data=json.loads(r.DATA_RE.search(out.read_text(encoding='utf-8')).group(1))
+    assert 'source_path' not in data['doc'] and 'someone' not in out.read_text(encoding='utf-8')
+
+
+def test_build_close_para_carries_note(clean):
+    doc,g=clean
+    _,_,comp=run_checks(doc,g)
+    d=r.build_data(doc,g,comp,None,{},None)
+    e=d['guide']['P1'] if 'guide' in d else d['entries']['P1']
+    assert e['tier']=='close' and e['read']=={'en':'Track the choices.'} and e['note']=={'en':'Buyers choose the smaller reward.'}
+
+
+def test_inline_math_in_paragraph_text_inlines_katex(clean):
+    # MinerU writes inline formulas into the paragraph text; the page must typeset them even when no note has LaTeX
+    doc, g = clean
+    _, _, comp = run_checks(doc, g)
+    assert r.build_data(doc, g, comp, None, {}, 'en')['has_tex'] is False
+    doc['items'][1]['text'] = 'One gets PPV = $u \beta R / ( R + \alpha )$ for the field.'
+    _, _, comp = run_checks(doc, g)
+    assert r.build_data(doc, g, comp, None, {}, 'en')['has_tex'] is True
+
+
+def test_remote_figure_images_never_reach_the_page(clean,tmp_path):
+    doc,g=clean
+    doc['items'][0]['text'] += ' Figure 1 shows choices.'
+    doc['items'].insert(1,{'id':'C1','type':'caption','text':'Figure 1. Choices','page':2})
+    _,_,comp=run_checks(doc,g)
+    png=tmp_path/'f.png'; png.write_bytes(b'PNGDATA')
+    src=lambda img:{'figures':[{'kind':'fig','num':1,'caption':'Choices','img':img}]}
+    d=r.build_data(doc,g,comp,src('https://example.invalid/f.png'),{},None)
+    assert 'img' not in d['open']['assets']['C1']
+    assert 'example.invalid' not in json.dumps(d)
+    assert r.build_data(doc,g,comp,src('data:image/png;base64,YQ=='),{},None)['open']['assets']['C1']['img']=='data:image/png;base64,YQ=='
+    assert r.build_data(doc,g,comp,src(str(png)),{},None)['open']['assets']['C1']['img'].startswith('data:image/png;base64,')
+
+
+def test_template_only_renders_data_uri_figure_images():
+    tpl=(r.SKILL_DIR/'assets/template.html').read_text(encoding='utf-8')
+    assert 'a.img && /^data:/i.test(a.img)' in tpl

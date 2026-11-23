@@ -1,0 +1,10 @@
+pdfplumber>=0.10
+# embedded font styles and encoded case validation
+fonttools>=4
+# page overlays, crop editing/rotation, and image re-encoding in render.py
+pillow
+# open versions (sources.py parse)
+beautifulsoup4
+# optional, better layout analysis (running heads, tables, formulas; CPU is fine):
+#   pip install "mineru>=4,<5" && mineru-kit models download --tier basic
+# segment.py uses it automatically; set MINERU_PYTHON if MinerU lives in another interpreter

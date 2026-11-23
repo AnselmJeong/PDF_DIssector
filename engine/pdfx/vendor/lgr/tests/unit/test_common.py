@@ -1,0 +1,124 @@
+import json
+import pytest
+import common as c
+
+@pytest.mark.parametrize('text,anchor,span', [
+    ('The “claim” holds.', '"claim"', (5,10)), ('a–b', 'a-b', (0,3)),
+    ('a ﬁrm', 'FIRM', (2,5)), ('a  b', 'a b', (0,4)),
+    ('中文 没有空格', '中文没有空格', (0,7)), ('abc', 'absent', None),
+    ('abc', '', None), ('a\u200bb', 'ab', (0,3)), ('…', '...', (0,1))])
+def test_anchor(text, anchor, span):
+    assert c.find_anchor(text, anchor) == span
+
+@pytest.mark.parametrize('value,expected', [('P3-P9',(3,9)),('P3–P9',(3,9)),('P3',(3,3)),('P3-9',(3,9))])
+def test_range(value, expected):
+    assert c.parse_range(value) == expected
+
+@pytest.mark.parametrize('value', ['foo','P9-P3','3-9',''])
+def test_bad_range(value):
+    with pytest.raises(ValueError): c.parse_range(value)
+
+def test_helpers():
+    assert c.compress([4,3,1,3,7]) == 'P1, P3-P4, P7'
+    assert c.compress([]) == ''
+    assert c.as_lang(None,'en') == {}
+    assert c.as_lang('text','en') == {'en':'text'}
+    assert c.as_lang({'en':3,'zh':None,'de':'x'},'en') == {'en':'3'}
+    assert c.pnum('P12') == 12 and c.pnum('no') is None
+    assert c.clean_text(' ﬁ\u00ad\t text\u00a0 ') == 'fi text'
+    assert c.is_cjk('中') and not c.is_cjk('') and not c.is_cjk('A')
+    assert c.fmt_num(3) == '3' and c.fmt_num(.5) == '0.5'
+    assert c.suggest_anchor('A long sentence. A short one.', 'A short one.') == 'A short one.'
+
+def test_numbers():
+    assert c.numbers_in('1,234.5 .001 2.25–2.75 2:1') == {1234.5,.001,2.25,2.75,2,1}
+    assert c.numbers_in('P12 Figure 2 Table 1 Experiment 1 第 3 页') == set()
+    assert c.source_numbers('three twice half 二十三 两 一万二千') == {3,2,.5,23,12000}
+
+def test_merge(tmp_path):
+    a,b = tmp_path/'a.json',tmp_path/'b.json'
+    a.write_text(json.dumps({'meta':{},'paras':{'P1':{'tier':'skim'}}}), encoding='utf-8')
+    b.write_text(json.dumps({'paras':{'P2':{'tier':'close'}}}), encoding='utf-8')
+    assert set(c.load_guide([a,b])['paras']) == {'P1','P2'}
+    assert c.load_guide([a,a])['meta'] == {}
+    b.write_text(json.dumps({'paras':{'P1':{'tier':'close'}}}), encoding='utf-8')
+    with pytest.raises(SystemExit, match='different content'): c.load_guide([a,b])
+
+@pytest.mark.parametrize('data,message', [('[]','top level'), ('{"paras": []}', 'must be an object'), ('{bad','JSON error')])
+def test_bad_json(tmp_path,data,message):
+    p=tmp_path/'bad.json'; p.write_text(data, encoding='utf-8')
+    with pytest.raises(SystemExit,match=message): c.load_guide([p])
+
+def test_meta_conflict(tmp_path):
+    a,b=tmp_path/'a.json',tmp_path/'b.json'
+    a.write_text('{"title":"a"}', encoding='utf-8'); b.write_text('{"title":"b"}', encoding='utf-8')
+    with pytest.raises(SystemExit,match='field title'): c.load_guide([a,b])
+
+def test_elements(tmp_path,monkeypatch):
+    assert len(c.load_elements()) == 26  # PATCH(pdfx): 7 biomedical/figx elements
+    (tmp_path/'references').mkdir()
+    (tmp_path/'references/elements.md').write_text('### good | Good | 好 | 2 | facts\nDescription\n### malformed\nIgnored\n', encoding='utf-8')
+    monkeypatch.setattr(c,'SKILL_DIR',tmp_path)
+    assert c.load_elements() == {'good':{'en':'Good','zh':'好','level':2,'family':'facts','desc':'Description'}}
+    assert c.skill_version() == '?'
+    (tmp_path/'CHANGELOG.md').write_text('## 0.3.0\n', encoding='utf-8')
+    assert c.skill_version() == '0.3.0'
+
+def test_elements_malformed_level_skipped(tmp_path,monkeypatch):
+    (tmp_path/'references').mkdir()
+    (tmp_path/'references/elements.md').write_text('### bad | Bad | 错 | nope | facts\nIgnored\n### good | Good | 好 | 2 | facts\nKept\n', encoding='utf-8')
+    monkeypatch.setattr(c,'SKILL_DIR',tmp_path)
+    assert set(c.load_elements()) == {'good'}
+
+
+def test_inline_math_spans_versus_money():
+    from common import inline_math_spans
+    assert [m.group(1) for m in inline_math_spans('between $1 + \\eta$ and $1 + \\eta\\lambda$, except at $0$, and $1 - p_M$')] == ['1 + \\eta', '1 + \\eta\\lambda', '0', '1 - p_M']
+    assert inline_math_spans('a salary of $50,000 against $60,000 expected') == []
+    assert inline_math_spans('paid $5 - $3 more') == []
+
+
+SPLIT_DOC = ['Most scientifi c fi ndings in this fi eld are false.',
+             'A signifi cant effect; the confl icts of interest, of fi ve authors.',
+             'Wi fi network and fl oz are untouched, off ice stays.']
+
+
+def test_split_ligatures_rejoined():
+    out = c.fix_split_ligatures(SPLIT_DOC)
+    assert out[0] == 'Most scientific findings in this field are false.'
+    assert out[1] == 'A significant effect; the conflicts of interest, of five authors.'
+
+
+def test_split_ligatures_normal_boundaries_kept():
+    out = c.fix_split_ligatures(SPLIT_DOC)[2]
+    assert out == SPLIT_DOC[2]
+    assert c.fix_split_ligatures(SPLIT_DOC + ['The ice is thick.'])[2] == SPLIT_DOC[2]
+
+
+def test_split_ligatures_ff_needs_intact_word():
+    base = SPLIT_DOC[:2]
+    assert 'diff erent' in c.fix_split_ligatures(base + ['diff erent here'])[2]
+    assert c.fix_split_ligatures(base + ['diff erent here, a different one'])[2] == 'different here, a different one'
+
+
+def test_split_ligatures_no_sign_no_change():
+    texts = ['If fine weather holds, of flow and off ice, the staff only.', 'One scientifi c case.']
+    assert c.fix_split_ligatures(texts) == texts
+
+
+def test_split_ligatures_single_letter_tail():
+    texts = SPLIT_DOC[:2] + ['A scientifi c claim, vitamin c and c.']
+    assert 'scientific claim' in c.fix_split_ligatures(texts)[2]
+
+
+def test_split_ligatures_proper_nouns_and_lone_evidence_untouched():
+    text = 'A Sufi mystic studies Sufi poetry and Sufi music.'
+    # no standalone fragment anywhere: nothing changes
+    assert c.fix_split_ligatures([text, 'One scientifi c case, another signifi cant one, of fi ve.']) == \
+        [text, 'One scientifi c case, another signifi cant one, of fi ve.']
+    # with the defect proven by standalone fragments, a mid-sentence capitalised name is still not joined
+    doc = ['The fi nding in this fi eld is clear.', 'A signifi cant effect.', text]
+    out = c.fix_split_ligatures(doc)
+    assert out[0] == 'The finding in this field is clear.'
+    assert out[1] == 'A significant effect.'
+    assert out[2] == text
