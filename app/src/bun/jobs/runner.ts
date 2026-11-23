@@ -163,7 +163,7 @@ export class JobRunner {
 	private llm(c: Ctx) {
 		const s = this.d.settings();
 		const cost = this.d.lib.doc(c.docId).costUsd;
-		if (s.costCapUsd > 0 && cost >= s.costCapUsd) {
+		if (s.llmBackend === "api" && s.costCapUsd > 0 && cost >= s.costCapUsd) {
 			throw new Error(`문서당 비용 상한($${s.costCapUsd})에 도달했습니다 (현재 $${cost.toFixed(2)}). 설정에서 상한을 올린 뒤 이어서 실행하세요.`);
 		}
 		return this.d.llm(c.docId, c.work);

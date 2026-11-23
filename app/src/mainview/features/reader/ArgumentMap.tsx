@@ -37,8 +37,11 @@ export function ArgumentMap({ data, onPick, current }: { data: ReaderData; onPic
 			}
 			depth[p.id] = d;
 		}
+		const layers: string[][] = [];
+		for (const p of live) (layers[depth[p.id] - 1] ??= []).push(p.id);
+		// at most 5 nodes per row: a long layer wraps onto extra rows
 		const rows: string[][] = [];
-		for (const p of live) (rows[depth[p.id] - 1] ??= []).push(p.id);
+		for (const layer of layers.filter(Boolean)) for (let i = 0; i < layer.length; i += 5) rows.push(layer.slice(i, i + 5));
 		const W = 860;
 		const nodeW = 150;
 		const rowH = 92;

@@ -125,6 +125,8 @@ export interface Finding {
 }
 
 export interface Settings {
+	llmBackend: "subscription" | "api"; // subscription = Claude Code CLI login; api = Anthropic API key
+	claudePath: string | null;
 	models: { writer: string; reviewer: string; helper: string };
 	defaultDensity: Density;
 	notesLang: "ko" | "en";
@@ -315,7 +317,7 @@ export type BunRequests = {
 	deleteAnnotation: { params: { docId: string; id: string }; response: { ok: true } };
 	exportHtml: { params: { docId: string; dir?: string }; response: { path: string } };
 	showInFolder: { params: { path: string }; response: { ok: true } };
-	getSettings: { params: Record<string, never>; response: Settings & { hasApiKey: boolean; engineOk: boolean; engineInfo: string } };
+	getSettings: { params: Record<string, never>; response: Settings & { hasApiKey: boolean; engineOk: boolean; engineInfo: string; claudeOk: boolean; claudeInfo: string } };
 	setSettings: { params: { settings: Partial<Settings> }; response: { ok: true } };
 	setApiKey: { params: { key: string | null }; response: { ok: true; hasApiKey: boolean } };
 	listRules: { params: Record<string, never>; response: UserRule[] };

@@ -18,7 +18,7 @@ export function DataNotice() {
 					</DialogTitle>
 					<DialogDescription asChild>
 						<div className="space-y-2 text-sm">
-							<p>PDF Dissector는 해설을 쓰기 위해 논문 본문, 페이지 이미지, 그림을 Anthropic Claude API로 보냅니다. 비용은 입력한 API 키의 계정에 청구됩니다.</p>
+							<p>PDF Dissector는 해설을 쓰기 위해 논문 본문, 페이지 이미지, 그림을 Claude로 보냅니다. 기본값은 이 Mac에 로그인된 Claude Code(구독)를 쓰며 구독 사용량에서 차감됩니다. API 키 방식을 고르면 그 계정에 청구됩니다.</p>
 							<p>원문 PDF와 해설, 메모는 이 컴퓨터에만 저장됩니다. 내보낸 HTML에는 원문이 들어 있으니 개인 학습용으로만 쓰세요.</p>
 							<p>공개 원문(PMC) 연동을 위해 논문의 DOI로 Europe PMC를 조회합니다.</p>
 						</div>

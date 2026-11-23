@@ -37,6 +37,8 @@ const MIGRATIONS: string[] = [
 ];
 
 export const DEFAULT_SETTINGS: Settings = {
+	llmBackend: "subscription",
+	claudePath: null,
 	models: { writer: "claude-opus-5-5", reviewer: "claude-sonnet-5-5", helper: "claude-haiku-5-5" },
 	defaultDensity: "medium",
 	notesLang: "ko",

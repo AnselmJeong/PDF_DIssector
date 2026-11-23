@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/rpc";
@@ -38,6 +39,40 @@ export function SettingsView() {
 			<div className="mx-auto max-w-3xl space-y-5 px-6 py-6">
 				<h1 className="text-lg font-semibold">설정</h1>
 
+				<Card>
+					<CardHeader>
+						<CardTitle className="text-base">Claude 연결 방식</CardTitle>
+						<CardDescription>구독 방식은 이 Mac에 로그인된 Claude Code(Pro/Max 구독)로 호출하므로 API 요금이 따로 나가지 않고 구독 사용량에서 차감됩니다.</CardDescription>
+					</CardHeader>
+					<CardContent className="space-y-3">
+						<RadioGroup value={st.llmBackend} onValueChange={(v) => save({ llmBackend: v as Settings["llmBackend"] })} className="gap-2">
+							<Label className="flex items-start gap-3 rounded-lg border p-3 font-normal has-[[data-state=checked]]:border-primary">
+								<RadioGroupItem value="subscription" className="mt-0.5" data-testid="backend-subscription" />
+								<div>
+									<div className="text-sm font-medium">Claude 구독 (Claude Code 로그인)</div>
+									<div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+										{st.claudeOk ? <CheckCircle2 className="size-3.5 text-emerald-600" /> : <XCircle className="size-3.5 text-destructive" />}
+										<span className="font-mono break-all">{st.claudeInfo}</span>
+									</div>
+									{!st.claudeOk && (
+										<div className="mt-1 text-xs">
+											Claude Code를 설치한 뒤 터미널에서 <code className="rounded bg-muted px-1">claude</code>를 실행해 로그인하세요.
+										</div>
+									)}
+								</div>
+							</Label>
+							<Label className="flex items-start gap-3 rounded-lg border p-3 font-normal has-[[data-state=checked]]:border-primary">
+								<RadioGroupItem value="api" className="mt-0.5" />
+								<div>
+									<div className="text-sm font-medium">Anthropic API 키</div>
+									<div className="text-xs text-muted-foreground">토큰 사용량만큼 API 계정에 청구됩니다.</div>
+								</div>
+							</Label>
+						</RadioGroup>
+					</CardContent>
+				</Card>
+
+				{st.llmBackend === "api" && (
 				<Card>
 					<CardHeader>
 						<CardTitle className="flex items-center gap-2 text-base">
@@ -79,11 +114,15 @@ export function SettingsView() {
 						)}
 					</CardContent>
 				</Card>
+				)}
 
 				<Card>
 					<CardHeader>
 						<CardTitle className="text-base">모델과 비용</CardTitle>
-						<CardDescription>가격은 입력 / 출력 100만 토큰당 달러입니다. 원 개발자 시험에서 6쪽 논문이 약 13만 토큰을 썼습니다.</CardDescription>
+						<CardDescription>
+							가격은 입력 / 출력 100만 토큰당 달러입니다.{" "}
+							{st.llmBackend === "subscription" ? "구독 방식에서는 청구되지 않고, 화면의 비용은 API로 환산한 참고값입니다." : "원 개발자 시험에서 6쪽 논문이 약 13만 토큰을 썼습니다."}
+						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
 						{(
@@ -110,7 +149,7 @@ export function SettingsView() {
 							</div>
 						))}
 						<div className="grid grid-cols-[220px_1fr] items-center gap-3">
-							<Label htmlFor="cap">문서당 비용 상한 (USD)</Label>
+							<Label htmlFor="cap">문서당 비용 상한 (USD, API 방식만)</Label>
 							<Input id="cap" type="number" min={0} step={0.5} defaultValue={st.costCapUsd} onBlur={(e) => save({ costCapUsd: Number(e.target.value) || 0 })} className="w-32" />
 						</div>
 						<div className="grid grid-cols-[220px_1fr] items-center gap-3">

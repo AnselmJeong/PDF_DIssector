@@ -7,6 +7,7 @@ import { resolveAnnotation } from "./annotations/reanchor";
 import { JobRunner } from "./jobs/runner";
 import { toEntry, Work, readJson } from "./jobs/work";
 import { DEFAULT_SETTINGS, Library, newId } from "./library/db";
+import { claudeVersion, ClaudeCodeClient, locateClaude } from "./llm/claudeCode";
 import { type Llm, LlmClient } from "./llm/client";
 import * as P from "./llm/prompts";
 import * as S from "./llm/schemas";
@@ -43,10 +44,29 @@ export function createBackend(pf: Platform) {
 	let refsCache: P.References | null = null;
 	const refs = async () => (refsCache ??= await bridge.call<P.References>("references"));
 
+	const llmReady = (): string | null => {
+		const s = lib.settings();
+		if (s.llmBackend === "api") return secrets.has() ? null : "Anthropic API 키가 없습니다. 설정에서 입력하거나 구독(Claude Code) 방식으로 바꾸세요.";
+		return locateClaude(s.claudePath) ? null : "Claude Code(claude 명령)를 찾지 못했습니다. Claude Code를 설치하고 `claude`로 한 번 로그인하세요.";
+	};
+
 	const llmFor = (docId: string, work: Work | null): Llm => {
+		const s = lib.settings();
+		const onUsage = (u: import("./llm/client").Usage, tag: string, logPath: string) => {
+			lib.addUsage(docId, u.tokensIn, u.tokensOut, u.costUsd);
+			const stage = (tag.split("_")[0] || "CHAT") as Stage;
+			lib.addStageUsage(docId, stage, u.tokensIn, u.tokensOut, u.costUsd);
+			lib.logLlmCall({ docId, jobId: null, stage, model: u.model, tokensIn: u.tokensIn, tokensOut: u.tokensOut, cacheRead: u.cacheRead, cacheWrite: u.cacheWrite, costUsd: u.costUsd, logPath });
+		};
+		const logDir = work ? work.path("llm_log") : join(pf.dataDir, "llm_log");
+		if (s.llmBackend !== "api") {
+			const bin = locateClaude(s.claudePath);
+			if (!bin) throw new Error("Claude Code(claude 명령)를 찾지 못했습니다. 설치 후 `claude`로 로그인하세요.");
+			return new ClaudeCodeClient(bin, join(pf.dataDir, "claude-cwd"), logDir, onUsage);
+		}
 		const key = secrets.get();
 		if (!key) throw new Error("Anthropic API 키가 없습니다. 설정에서 입력하세요.");
-		return new LlmClient(key, work ? work.path("llm_log") : join(pf.dataDir, "llm_log"), (u, tag, logPath) => {
+		return new LlmClient(key, logDir, (u, tag, logPath) => {
 			lib.addUsage(docId, u.tokensIn, u.tokensOut, u.costUsd);
 			const stage = (tag.split("_")[0] || "CHAT") as Stage;
 			lib.addStageUsage(docId, stage, u.tokensIn, u.tokensOut, u.costUsd);
@@ -193,7 +213,8 @@ export function createBackend(pf: Platform) {
 			return lib.getBrief(docId);
 		},
 		async startJob({ docId, from }) {
-			if (!secrets.has()) throw new Error("Anthropic API 키가 없습니다. 설정에서 입력하세요.");
+			const notReady = llmReady();
+			if (notReady) throw new Error(notReady);
 			lib.updateDocument(docId, { status: "queued" });
 			return { jobId: runner.start(docId, from) };
 		},
@@ -338,7 +359,10 @@ export function createBackend(pf: Platform) {
 			} catch (e) {
 				engineInfo = `엔진 오류: ${(e as Error).message.slice(0, 300)}`;
 			}
-			return { ...lib.settings(), hasApiKey: secrets.has(), engineOk, engineInfo };
+			const s = lib.settings();
+			const bin = locateClaude(s.claudePath);
+			const ver = bin ? claudeVersion(bin) : null;
+			return { ...s, hasApiKey: secrets.has(), engineOk, engineInfo, claudeOk: !!ver, claudeInfo: ver ? `${ver} (${bin})` : "claude 명령을 찾지 못했습니다" };
 		},
 		async setSettings({ settings }) {
 			lib.setSettings(settings);

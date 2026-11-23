@@ -99,14 +99,14 @@ export function LibraryView() {
 			</header>
 
 			<div className="flex flex-col gap-3 px-6 pt-4">
-				{settings.data && !settings.data.hasApiKey && (
+				{settings.data && (settings.data.llmBackend === "api" ? !settings.data.hasApiKey : !settings.data.claudeOk) && (
 					<Alert>
 						<AlertTriangle />
-						<AlertTitle>Anthropic API 키가 없습니다</AlertTitle>
+						<AlertTitle>{settings.data.llmBackend === "api" ? "Anthropic API 키가 없습니다" : "Claude Code 로그인을 찾지 못했습니다"}</AlertTitle>
 						<AlertDescription>
-							해설 작성에는 Claude API가 필요합니다.{" "}
+							해설 작성에는 Claude 연결이 필요합니다.{" "}
 							<button className="underline" onClick={() => go({ name: "settings" })}>
-								설정에서 키를 입력하세요.
+								설정에서 연결 방식을 확인하세요.
 							</button>
 						</AlertDescription>
 					</Alert>
