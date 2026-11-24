@@ -11,3 +11,4 @@ app/artifacts/
 app/engine-dist/
 app/.hutch/
 *.tsbuildinfo
+release/
