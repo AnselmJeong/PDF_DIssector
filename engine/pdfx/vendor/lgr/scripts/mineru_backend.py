@@ -3,7 +3,7 @@
 
   python mineru_backend.py run reading.pdf --out WORK [--pages 3-28]   # what segment.py --engine mineru calls
 
-MinerU (pip install "mineru>=4,<5"; mineru-kit models download --tier basic) supplies running-head removal,
+MinerU (uv tool install "mineru>=4,<5"; mineru-kit models download --tier basic) supplies running-head removal,
 headings, tables as structure and the position of display formulas. If its 577 MB formula model (MFR) is
 installed it also supplies LaTeX; otherwise formulas are cropped images that the reading model transcribes.
 The skill's own rules (sidebar, front matter, numbered-heading depth, footnote linking) are applied here."""
@@ -36,9 +36,18 @@ def clean(s):
     return re.sub(r"\s+", " ", s).strip()
 
 
+def _child_env():
+    # PATCH(pdfx): MinerU lives in its own interpreter (a uv tool venv). The engine's PYTHONPATH points at
+    # packages built for the bundled Python (e.g. PIL for cp312) and would shadow MinerU's own, so drop it.
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    env.pop("PYTHONPATH", None)
+    env.pop("PYTHONHOME", None)
+    return env
+
+
 def _can_import(python):
     try:
-        return subprocess.run([python, "-c", "import mineru"], capture_output=True, timeout=60).returncode == 0
+        return subprocess.run([python, "-c", "import mineru"], capture_output=True, timeout=60, env=_child_env()).returncode == 0
     except Exception:
         return False
 
@@ -94,7 +103,7 @@ def run(pdf_path, out_dir, pages=None, python=None):
     if pages:
         cmd += ["-p", pages]
     print(f"MinerU: {'with formula model' if mode == '--with-mfr' else 'light, display formulas as crops'} …", file=sys.stderr, flush=True)
-    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    env = _child_env()
     res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", env=env)
     if res.returncode != 0:
         sys.exit("MinerU failed:\n" + res.stderr[-2000:])

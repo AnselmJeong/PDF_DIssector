@@ -486,7 +486,7 @@ settings(key PK, value)
 
 ## 8. 패키징과 배포
 
-- Python: python-build-standalone(arm64/x64) + `uv pip install --target`로 pdfplumber, fonttools, pillow, beautifulsoup4, lxml을 미리 설치해 `engine/`로 동봉 (약 60~90MB 예상). MinerU는 동봉하지 않고 설정에서 선택 설치(`pip install "mineru>=4,<5"` + `mineru-kit models download --tier basic`).
+- Python: python-build-standalone(arm64/x64) + `uv pip install --target`로 pdfplumber, fonttools, pillow, beautifulsoup4, lxml을 미리 설치해 `engine/`로 동봉 (약 60~90MB 예상). MinerU는 동봉하지 않고 설정에서 선택 설치(`uv tool install "mineru>=4,<5"` + `mineru-kit models download --tier basic`, uv tool 전역 설치).
 - macOS: Hutch로 서명·공증 (`ELECTROBUN_DEVELOPER_ID`, App Store Connect API key 환경변수). 동봉 Python 바이너리와 `.so`까지 서명 대상에 포함되는지 M6에서 확인.
 - Electrobun은 현재 호스트용으로만 빌드되므로, 배포 대상(macOS arm64 우선, 이후 Intel/Windows/Linux)마다 CI runner가 필요하다.
 - 업데이트: Electrobun Updater와 delta patch(`release.generatePatch`).

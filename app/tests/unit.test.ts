@@ -3,6 +3,10 @@ import { resolveAnnotation } from "../src/bun/annotations/reanchor";
 import { repairParts } from "../src/bun/jobs/runner";
 import { clean, idsInRange, toEntry } from "../src/bun/jobs/work";
 import { costOf } from "../src/bun/llm/client";
+import { mineruEnv } from "../src/bun/pipeline/bridge";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const anno = (exact: string, prefix: string, suffix: string, start: number, sid: string | null) => ({
 	sid,
@@ -79,4 +83,23 @@ test("cost accounting", () => {
 	expect(costOf("claude-opus-5-5", { input_tokens: 1e6, output_tokens: 1e6 })).toBeCloseTo(24);
 	// cache read at $0.20/M, cache write at 1.25x input
 	expect(costOf("claude-opus-5-5", { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 1e6, cache_creation_input_tokens: 1e6 })).toBeCloseTo(0.2 + 5);
+});
+
+describe("mineruEnv", () => {
+	test("adds ~/.local/bin to a Finder-style PATH and finds the uv tool interpreter", () => {
+		const home = mkdtempSync(join(tmpdir(), "pdfx-home-"));
+		const py = join(home, ".local", "share", "uv", "tools", "mineru", "bin", "python");
+		mkdirSync(join(py, ".."), { recursive: true });
+		writeFileSync(py, "");
+		const env = mineruEnv({ PATH: "/usr/bin:/bin" }, home);
+		expect(env.PATH.split(":")[0]).toBe(join(home, ".local", "bin"));
+		expect(env.PATH.endsWith("/usr/bin:/bin")).toBe(true);
+		expect(env.MINERU_PYTHON).toBe(py);
+	});
+
+	test("keeps an explicit MINERU_PYTHON and skips a missing uv tool", () => {
+		const home = mkdtempSync(join(tmpdir(), "pdfx-home-"));
+		expect(mineruEnv({ PATH: "/usr/bin", MINERU_PYTHON: "/x/python" }, home).MINERU_PYTHON).toBeUndefined();
+		expect(mineruEnv({ PATH: "/usr/bin" }, home).MINERU_PYTHON).toBeUndefined();
+	});
 });
