@@ -213,9 +213,9 @@ export function SettingsView() {
 						<CardDescription>
 							가격은 입력 / 출력 100만 토큰당 달러입니다.{" "}
 							{st.llmBackend === "subscription"
-								? "구독 방식에서는 청구되지 않고, 화면의 비용은 API로 환산한 참고값입니다."
+								? "구독 방식에서는 논문마다 청구되지 않으므로, 라이브러리와 처리 화면에는 비용 대신 사용한 토큰 수를 보여 줍니다."
 								: st.llmBackend === "ollama"
-									? "Ollama는 요금제로 청구되므로 비용은 $0로 기록되고 토큰 수만 남습니다. 모델은 위 Ollama 연결에서 정합니다."
+									? "Ollama는 요금제로 청구되므로 화면에는 비용 대신 토큰 수를 보여 줍니다. 모델은 위 Ollama 연결에서 정합니다."
 									: "원 개발자 시험에서 6쪽 논문이 약 13만 토큰을 썼습니다."}
 						</CardDescription>
 					</CardHeader>

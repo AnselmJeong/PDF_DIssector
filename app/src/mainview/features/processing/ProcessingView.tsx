@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Timeline, TimelineContent, TimelineDate, TimelineHeader, TimelineIndicator, TimelineItem, TimelineSeparator, TimelineTitle } from "@/components/reui/timeline";
 import { api, fileUrl, on } from "@/lib/rpc";
 import { useApp } from "@/lib/store";
+import { fmtUsage, useApiBilling } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import { useEffect } from "react";
 import type { Stage, StageRecord } from "../../../shared/types";
@@ -38,6 +39,7 @@ export function ProcessingView({ docId }: { docId: string }) {
 	const { go } = useApp();
 	const job = useQuery({ queryKey: ["job", docId], queryFn: () => api.getJob({ docId }), refetchInterval: (q) => (q.state.data?.running || q.state.data?.queuePosition ? 3000 : false) });
 	const docs = useQuery({ queryKey: ["docs"], queryFn: () => api.listDocs({}) });
+	const apiBilling = useApiBilling();
 	const doc = docs.data?.find((d) => d.id === docId);
 	const settings = useQuery({ queryKey: ["settings"], queryFn: () => api.getSettings({}) });
 	const awaiting = doc?.status === "awaiting_fixes";
@@ -88,7 +90,7 @@ export function ProcessingView({ docId }: { docId: string }) {
 						<span>
 							{doneCount}/{stages.length} 단계
 						</span>
-						<span>· 비용 ${doc?.costUsd.toFixed(3) ?? "0"}</span>
+						{apiBilling && <span>· 비용 ${doc?.costUsd.toFixed(3) ?? "0"}</span>}
 						<span>
 							· 토큰 {((doc?.tokensIn ?? 0) / 1000).toFixed(1)}k 입력 / {((doc?.tokensOut ?? 0) / 1000).toFixed(1)}k 출력
 						</span>
@@ -133,7 +135,7 @@ export function ProcessingView({ docId }: { docId: string }) {
 									<TimelineSeparator className="group-data-[orientation=vertical]/timeline:-left-6 group-data-[orientation=vertical]/timeline:h-[calc(100%-1.5rem-0.25rem)] group-data-[orientation=vertical]/timeline:translate-y-6.5" />
 									<TimelineDate className="text-[11px]">
 										{fmtTime(s.startedAt)} {s.startedAt && `· ${dur(s.startedAt, s.finishedAt)}`}
-										{s.costUsd > 0 && ` · $${s.costUsd.toFixed(3)}`}
+										{s.tokensIn + s.tokensOut > 0 && ` · ${fmtUsage(s, apiBilling, 3)}`}
 										{s.attempts > 1 && ` · 시도 ${s.attempts}회`}
 									</TimelineDate>
 									<TimelineTitle className="flex items-center gap-2 text-sm">
@@ -214,6 +216,7 @@ export function ProcessingView({ docId }: { docId: string }) {
 function InspectPanel({ docId, awaiting }: { docId: string; awaiting: boolean }) {
 	const qc = useQueryClient();
 	const job = useQuery({ queryKey: ["job", docId], queryFn: () => api.getJob({ docId }) });
+	const apiBilling = useApiBilling();
 	const overlays = job.data?.overlays ?? [];
 	const fixes = job.data?.fixes ?? [];
 	const [page, setPage] = useState<number | null>(null);
@@ -258,7 +261,7 @@ function InspectPanel({ docId, awaiting }: { docId: string; awaiting: boolean })
 							variant="outline"
 							className="w-full"
 							onClick={async () => {
-								if (!confirm("보정을 다시 적용하면 문단 번호가 바뀌어 해설을 처음부터 다시 씁니다 (API 비용 발생). 계속할까요?")) return;
+								if (!confirm(`보정을 다시 적용하면 문단 번호가 바뀌어 해설을 처음부터 다시 씁니다 (${apiBilling ? "API 비용 발생" : "요금제 사용량 소모"}). 계속할까요?`)) return;
 								await api.reapplyFixes({ docId });
 								qc.invalidateQueries({ queryKey: ["job", docId] });
 							}}
