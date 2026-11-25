@@ -1,35 +1,47 @@
+/* Cascade order for Tailwind + Astryx (astryx docs styling-libraries/tailwind). Must stay above the Tailwind import. */
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
+
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "katex/dist/katex.min.css";
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * The app's shadcn tokens read the Astryx theme (chocolate). The root <Theme> mirrors data-astryx-theme onto <html>,
+ * so these resolve there and reach portals (dialogs, popovers) too. Light/dark comes from <Theme mode>.
+ */
 :root {
-	--radius: 0.6rem;
-	--background: oklch(0.99 0.003 85);
-	--foreground: oklch(0.2 0.01 260);
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.2 0.01 260);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.2 0.01 260);
-	--primary: oklch(0.42 0.12 255);
-	--primary-foreground: oklch(0.98 0 0);
-	--secondary: oklch(0.96 0.006 260);
-	--secondary-foreground: oklch(0.25 0.01 260);
-	--muted: oklch(0.96 0.006 260);
-	--muted-foreground: oklch(0.5 0.015 260);
-	--accent: oklch(0.95 0.01 255);
-	--accent-foreground: oklch(0.25 0.02 260);
-	--destructive: oklch(0.58 0.22 27);
-	--border: oklch(0.91 0.006 260);
-	--input: oklch(0.91 0.006 260);
-	--ring: oklch(0.6 0.1 255);
-	--sidebar: oklch(0.975 0.004 85);
-	--study: oklch(0.5 0.13 255);
-	--study-bg: oklch(0.965 0.02 255);
-	--skim: oklch(0.52 0.1 160);
-	--skim-bg: oklch(0.97 0.02 160);
-	--skip: oklch(0.6 0.01 260);
+	--radius: 0.7rem;
+}
+[data-astryx-theme] {
+	--background: var(--color-background-body);
+	--foreground: var(--color-text-primary);
+	--card: var(--color-background-card);
+	--card-foreground: var(--color-text-primary);
+	--popover: var(--color-background-popover);
+	--popover-foreground: var(--color-text-primary);
+	--primary: var(--color-accent);
+	--primary-foreground: var(--color-on-accent);
+	--secondary: var(--color-background-muted);
+	--secondary-foreground: var(--color-text-primary);
+	--muted: var(--color-background-muted);
+	--muted-foreground: color-mix(in oklab, var(--color-text-primary) 64%, var(--color-background-body));
+	--accent: color-mix(in oklab, var(--color-accent) 11%, var(--color-background-body));
+	--accent-foreground: var(--color-text-primary);
+	--destructive: var(--color-error);
+	--border: var(--color-border);
+	--input: var(--color-border-emphasized);
+	--ring: var(--color-accent);
+	--sidebar: var(--color-background-surface);
+	/* reading tiers: close reads carry the theme accent, skim a calm teal, skip stays neutral */
+	--study: var(--color-accent);
+	--study-bg: color-mix(in oklab, var(--color-accent) 9%, var(--color-background-body));
+	--skim: var(--color-icon-teal);
+	--skim-bg: color-mix(in oklab, var(--color-icon-teal) 9%, var(--color-background-body));
+	--skip: var(--color-icon-secondary);
 	--hl: oklch(0.93 0.09 95);
 	--hl-def: oklch(0.92 0.06 200);
 	--hl-ev: oklch(0.92 0.07 150);
@@ -38,31 +50,8 @@
 	--hl-user: oklch(0.9 0.12 95);
 }
 
-.dark {
-	--background: oklch(0.18 0.01 260);
-	--foreground: oklch(0.93 0.005 260);
-	--card: oklch(0.22 0.01 260);
-	--card-foreground: oklch(0.93 0.005 260);
-	--popover: oklch(0.22 0.01 260);
-	--popover-foreground: oklch(0.93 0.005 260);
-	--primary: oklch(0.72 0.12 255);
-	--primary-foreground: oklch(0.18 0.01 260);
-	--secondary: oklch(0.27 0.01 260);
-	--secondary-foreground: oklch(0.93 0.005 260);
-	--muted: oklch(0.27 0.01 260);
-	--muted-foreground: oklch(0.7 0.01 260);
-	--accent: oklch(0.3 0.02 255);
-	--accent-foreground: oklch(0.93 0.005 260);
-	--destructive: oklch(0.65 0.2 27);
-	--border: oklch(0.32 0.01 260);
-	--input: oklch(0.32 0.01 260);
-	--ring: oklch(0.6 0.1 255);
-	--sidebar: oklch(0.2 0.01 260);
-	--study: oklch(0.75 0.12 255);
-	--study-bg: oklch(0.26 0.04 255);
-	--skim: oklch(0.75 0.1 160);
-	--skim-bg: oklch(0.25 0.03 160);
-	--skip: oklch(0.6 0.01 260);
+.dark[data-astryx-theme],
+.dark [data-astryx-theme] {
 	--hl: oklch(0.42 0.08 95);
 	--hl-def: oklch(0.4 0.06 200);
 	--hl-ev: oklch(0.4 0.07 150);
@@ -72,9 +61,10 @@
 }
 
 @theme inline {
-	--font-sans: "Pretendard", "Apple SD Gothic Neo", -apple-system, "Segoe UI", system-ui, sans-serif;
+	--font-sans: "Albert Sans", "Pretendard", "Apple SD Gothic Neo", -apple-system, "Segoe UI", system-ui, sans-serif;
 	--font-serif: "Charter", "Iowan Old Style", "Source Serif 4", Georgia, "Apple SD Gothic Neo", serif;
-	--font-mono: "SF Mono", ui-monospace, Menlo, monospace;
+	--font-display: Fraunces, "Apple SD Gothic Neo", "Pretendard", Georgia, serif;
+	--font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
 	--radius-sm: calc(var(--radius) - 4px);
 	--radius-md: calc(var(--radius) - 2px);
 	--radius-lg: var(--radius);
@@ -111,7 +101,8 @@
 	}
 	html,
 	body,
-	#root {
+	#root,
+	#root > [data-astryx-theme] {
 		height: 100%;
 	}
 	body {
@@ -172,4 +163,116 @@ mark.user {
 	100% {
 		box-shadow: 0 0 0 0 transparent;
 	}
+}
+
+/* ---------- editorial reader (design A) ---------- */
+.reader-page {
+	/* the left gutter holds chapter numerals and the active-paragraph bar */
+	--gutter: 5.25rem;
+}
+.orig-close {
+	font-size: 1.14rem;
+	line-height: 1.8;
+	hanging-punctuation: first;
+}
+sup.hl-num {
+	font-family: var(--font-sans);
+	font-size: 0.62em;
+	font-weight: 700;
+	margin-left: 1px;
+	color: var(--muted-foreground);
+}
+.margin-note {
+	border-color: var(--hl);
+}
+.margin-note[data-family="def"] {
+	border-color: var(--hl-def);
+}
+.margin-note[data-family="ev"],
+.margin-note[data-family="fig"] {
+	border-color: var(--hl-ev);
+}
+.margin-note[data-family="math"] {
+	border-color: var(--hl-math);
+}
+.margin-note[data-family="limit"] {
+	border-color: var(--hl-limit);
+}
+.margin-num {
+	display: inline-grid;
+	place-items: center;
+	width: 1.05rem;
+	height: 1.05rem;
+	border-radius: 999px;
+	background: var(--muted);
+	color: var(--foreground);
+	font-size: 10px;
+}
+.reader-rail .rail-label {
+	margin-bottom: 0.35rem;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.05em;
+	color: var(--study);
+}
+.rail-spine {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+.rail-spine::before {
+	content: "";
+	position: absolute;
+	left: 5px;
+	top: 10px;
+	bottom: 10px;
+	width: 1px;
+	background: var(--border);
+}
+.rail-item {
+	display: grid;
+	grid-template-columns: 11px 1.4rem minmax(0, 1fr);
+	align-items: center;
+	gap: 0.35rem;
+	width: 100%;
+	padding: 0.3rem 0.25rem 0.3rem 0;
+	border-radius: 0.4rem;
+	text-align: left;
+	font-size: 12.5px;
+	color: var(--muted-foreground);
+}
+.rail-item:hover {
+	color: var(--foreground);
+}
+.rail-dot {
+	position: relative;
+	z-index: 1;
+	width: 11px;
+	height: 11px;
+	border-radius: 999px;
+	border: 2px solid var(--input);
+	background: var(--background);
+}
+.rail-num {
+	font-size: 10px;
+	font-variant-numeric: tabular-nums;
+	opacity: 0.75;
+}
+.rail-item[data-active] {
+	color: var(--foreground);
+	font-weight: 600;
+}
+.rail-item[data-active] .rail-dot {
+	border-color: var(--study);
+	background: var(--study);
+	box-shadow: 0 0 0 4px var(--study-bg);
+}
+.rail-item[data-skip] {
+	opacity: 0.55;
+}
+/* the reading-progress hairline under the reader's top bar */
+.reader-progress .astryx-progress-bar-track {
+	height: 3px;
+	border-radius: 0;
 }

@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookMarked, Download, FileText, Highlighter, Loader2, MessageCircleQuestion, NotebookPen, StickyNote, Trash2 } from "lucide-react";
+import { ArrowLeft, BookMarked, ChevronRight, Download, FileText, Highlighter, Loader2, MessageCircleQuestion, NotebookPen, StickyNote, Trash2, X } from "lucide-react";
+import { Button as AxButton } from "@astryxdesign/core/Button";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { Kbd } from "@astryxdesign/core/Kbd";
+import { ProgressBar } from "@astryxdesign/core/ProgressBar";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
+import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { api } from "@/lib/rpc";
 import { L, useApp } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -33,7 +38,16 @@ export function ReaderView({ docId, initialPid }: { docId: string; initialPid?: 
 	const settings = useQuery({ queryKey: ["settings"], queryFn: () => api.getSettings({}) });
 	const [mode, setMode] = useState<ViewMode>("full");
 	const [current, setCurrent] = useState<string | null>(initialPid ?? null);
-	const [side, setSide] = useState<"pdf" | "chat" | "notes" | null>("pdf");
+	// the tool drawer stays shut until asked for (design A), and remembers what the reader last left open
+	const [side, setSideState] = useState<"pdf" | "chat" | "notes" | null>(() => (localStorage.getItem("pdfx-side") as "pdf" | "chat" | "notes" | null) || null);
+	const setSide = useCallback((v: "pdf" | "chat" | "notes" | null | ((s: "pdf" | "chat" | "notes" | null) => "pdf" | "chat" | "notes" | null)) => {
+		setSideState((prev) => {
+			const next = typeof v === "function" ? v(prev) : v;
+			if (next) localStorage.setItem("pdfx-side", next);
+			else localStorage.removeItem("pdfx-side");
+			return next;
+		});
+	}, []);
 	const [busy, setBusy] = useState<Set<string>>(new Set());
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
 	const [chatSeed, setChatSeed] = useState<string | null>(null);
@@ -259,19 +273,23 @@ export function ReaderView({ docId, initialPid }: { docId: string; initialPid?: 
 			const part = partOf(id);
 			if (part && part.id !== lastPart) {
 				lastPart = part.id;
+				const num = data.parts.indexOf(part) + 1;
 				stream.push(
-					<div key={`part-${part.id}`} id={`part-${part.id}`} className="mt-8 mb-2 scroll-mt-20 border-b pb-2">
-						<div className="text-[11px] font-semibold tracking-wide text-muted-foreground">
-							{part.id} · {part.range}
-							{part.skip && " · 생략 가능한 부분"}
+					<header key={`part-${part.id}`} id={`part-${part.id}`} className={cn("chapter mt-14 mb-3 grid scroll-mt-20 grid-cols-[var(--gutter)_1fr] border-t pt-5", part.skip && "opacity-75")}>
+						<span className="font-display text-[3.4rem] leading-[0.9] font-light text-study/80 tabular-nums">{String(num).padStart(2, "0")}</span>
+						<div className="min-w-0">
+							<div className="text-xs text-muted-foreground">
+								{part.id} · {part.range}
+								{part.skip && " · 생략 가능한 부분"}
+							</div>
+							<h2 className="font-display mt-0.5 text-[1.55rem] leading-snug font-semibold">{L(part.title)}</h2>
+							{L(part.claim) && (
+								<p className="mt-1 max-w-2xl text-[0.97rem] leading-relaxed text-muted-foreground">
+									<MathText text={L(part.claim)} />
+								</p>
+							)}
 						</div>
-						<h2 className="text-base font-semibold">{L(part.title)}</h2>
-						{L(part.claim) && (
-							<p className="mt-0.5 text-sm text-muted-foreground">
-								<MathText text={L(part.claim)} />
-							</p>
-						)}
-					</div>,
+					</header>,
 				);
 			}
 			stream.push(
@@ -308,7 +326,7 @@ export function ReaderView({ docId, initialPid }: { docId: string; initialPid?: 
 			const next = data.order.slice(data.order.indexOf(id) + 1).find((x) => data.items[x].type === "para");
 			if (part2?.recall?.length && (!next || partOf(next)?.id !== part2.id) && mode !== "study") {
 				stream.push(
-					<Collapsible key={`recall-${part2.id}`} className="mx-4 mt-2 rounded-lg border border-dashed p-3">
+					<Collapsible key={`recall-${part2.id}`} className="mt-3 ml-[var(--gutter)] max-w-[40rem] rounded-lg border border-dashed p-3">
 						<CollapsibleTrigger className="text-xs font-semibold text-muted-foreground">되짚기 질문 ({part2.recall.length})</CollapsibleTrigger>
 						<CollapsibleContent className="mt-2 space-y-2">
 							{part2.recall.map((r, i) => (
@@ -327,36 +345,48 @@ export function ReaderView({ docId, initialPid }: { docId: string; initialPid?: 
 			}
 		} else if (it.type === "heading" && mode === "full") {
 			stream.push(
-				<div key={id} className={cn("orig mt-5 mb-1 px-4 font-semibold", (it.level ?? 1) <= 1 ? "text-lg" : "text-base")}>
+				<div key={id} className={cn("mt-6 mb-1 pl-[var(--gutter)] text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase", (it.level ?? 1) <= 1 && "text-xs")}>
 					{it.text}
 				</div>,
 			);
 		} else if (it.type === "caption" && looseCaps.has(id) && mode === "full") {
 			stream.push(
-				<div key={id} className="orig px-4 py-1 text-[0.9rem] text-muted-foreground">
+				<div key={id} className="orig max-w-[40rem] py-1 pl-[var(--gutter)] text-[0.9rem] text-muted-foreground">
 					{it.text}
 				</div>,
 			);
 		}
 	}
 
+	const progress = closeIds.length ? Math.round((readClose / closeIds.length) * 100) : 0;
+	const sideTabs = [
+		{ key: "pdf" as const, label: "PDF", icon: FileText, hint: "PDF (p)" },
+		{ key: "chat" as const, label: "질문", icon: MessageCircleQuestion, hint: "AI에게 묻기" },
+		{ key: "notes" as const, label: payload.annotations.length ? `메모 ${payload.annotations.length}` : "메모", icon: StickyNote, hint: "내 메모" },
+	];
+
 	return (
 		<div className="flex h-full flex-col">
-			<header className="flex items-center gap-3 border-b px-4 py-2">
-				<div className="min-w-0">
-					<div className="truncate text-sm font-semibold">{title}</div>
+			{/* top bar: where you are, how to read, which tool drawer is open; a hairline progress bar runs along its foot */}
+			<header className="relative flex items-center gap-3 px-4 py-2.5">
+				<IconButton variant="ghost" size="sm" label="라이브러리로" tooltip="라이브러리로" icon={<Icon icon={ArrowLeft} />} onClick={() => go({ name: "library" })} />
+				<div className="min-w-0 flex-1">
 					<div className="truncate text-[11px] text-muted-foreground">
-						{[L(meta.author), L(meta.source), L(meta.genre)].filter(Boolean).join(" · ")} · {paraIds.length}개 문단, 정독 {closeIds.length}개
+						{[L(meta.author), L(meta.source)].filter(Boolean).join(" · ")} · 문단 {paraIds.length}개 중 정독 {closeIds.length}개
 					</div>
+					<div className="truncate text-sm font-medium">{title}</div>
 				</div>
-				<ToggleGroup type="single" value={mode} onValueChange={(v) => v && setMode(v as ViewMode)} size="sm" variant="outline" className="ml-auto">
-					<ToggleGroupItem value="full">전체</ToggleGroupItem>
-					<ToggleGroupItem value="study">정독만</ToggleGroupItem>
-					<ToggleGroupItem value="gist">요약만</ToggleGroupItem>
-				</ToggleGroup>
-				<Button
-					variant="outline"
+				<SegmentedControl size="sm" label="보기" value={mode} onChange={(v) => setMode(v as ViewMode)}>
+					<SegmentedControlItem value="full" label="전체" />
+					<SegmentedControlItem value="study" label="정독만" />
+					<SegmentedControlItem value="gist" label="요약만" />
+				</SegmentedControl>
+				<AxButton
 					size="sm"
+					variant="ghost"
+					label="HTML"
+					tooltip="HTML로 내보내기"
+					icon={<Icon icon={Download} />}
 					onClick={async () => {
 						try {
 							const r = await api.exportHtml({ docId });
@@ -365,187 +395,215 @@ export function ReaderView({ docId, initialPid }: { docId: string; initialPid?: 
 							toast.error((e as Error).message);
 						}
 					}}
-				>
-					<Download /> HTML
-				</Button>
-				<ToggleGroup type="single" value={side ?? ""} onValueChange={(v) => setSide((v || null) as typeof side)} size="sm" variant="outline">
-					<ToggleGroupItem value="pdf" title="PDF (p)">
-						<FileText />
-					</ToggleGroupItem>
-					<ToggleGroupItem value="chat" title="질문">
-						<MessageCircleQuestion />
-					</ToggleGroupItem>
-					<ToggleGroupItem value="notes" title="내 메모">
-						<StickyNote />
-					</ToggleGroupItem>
-				</ToggleGroup>
+				/>
+				<div className="flex items-center gap-0.5">
+					{sideTabs.map((t) => (
+						<IconButton
+							key={t.key}
+							size="sm"
+							variant={side === t.key ? "secondary" : "ghost"}
+							label={t.label}
+							tooltip={t.hint}
+							icon={<Icon icon={t.icon} />}
+							onClick={() => setSide(side === t.key ? null : t.key)}
+						/>
+					))}
+				</div>
+				<div className="reader-progress absolute inset-x-0 -bottom-px">
+					<ProgressBar label="정독 진행" isLabelHidden value={progress} />
+				</div>
 			</header>
-			<ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
-				<ResizablePanel defaultSize="20%" minSize="14%" maxSize="30%">
-					<aside className="h-full space-y-4 overflow-y-auto bg-sidebar p-3 text-sm" data-testid="margin">
+
+			<div className="flex min-h-0 flex-1">
+				{/* argument rail: the paper's parts as a numbered spine, then what matters in the current part */}
+				<nav className="reader-rail flex w-56 shrink-0 flex-col gap-5 overflow-y-auto px-4 pt-7 pb-6 text-sm max-lg:hidden" aria-label="논증 구조" data-testid="margin">
+					<ol className="rail-spine">
+						{data.parts.map((p, i) => (
+							<li key={p.id}>
+								<button
+									onClick={() => jump(paraIds.find((id) => inRange(p.range, id)) ?? paraIds[0])}
+									className="rail-item"
+									data-active={curPart?.id === p.id || undefined}
+									data-skip={p.skip || undefined}
+									title={`${L(p.title)} · ${p.range}`}
+								>
+									<span className="rail-dot" />
+									<span className="rail-num">{String(i + 1).padStart(2, "0")}</span>
+									<span className="truncate">{L(p.title)}</span>
+								</button>
+							</li>
+						))}
+					</ol>
+					{curPart && (
 						<div>
-							<div className="mb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">논증 구조</div>
-							<ul className="space-y-0.5">
-								{data.parts.map((p) => (
-									<li key={p.id}>
-										<button
-											onClick={() => jump(paraIds.find((id) => inRange(p.range, id)) ?? paraIds[0])}
-											className={cn("w-full truncate rounded px-1.5 py-1 text-left text-xs hover:bg-accent", curPart?.id === p.id && "bg-accent font-medium", p.skip && "text-muted-foreground")}
-										>
-											{L(p.title)} <span className="text-muted-foreground">{p.range}</span>
+							<div className="rail-label">이 부분의 주장</div>
+							<div className="text-[13px] leading-snug">
+								<MathText text={L(curPart.claim) || L(curPart.role)} />
+							</div>
+							{curPart.claim_p && (
+								<button className="mt-1 text-[11px] text-study hover:underline" onClick={() => jump(curPart.claim_p!)}>
+									{curPart.claim_p}에서 →
+								</button>
+							)}
+						</div>
+					)}
+					{flow.length > 0 && (
+						<div>
+							<div className="rail-label">추론 단계</div>
+							<ol className="space-y-0.5">
+								{flow.map((s, i) => (
+									<li key={i}>
+										<button onClick={() => jump(s.p)} className={cn("flex w-full gap-1.5 rounded-md px-1.5 py-1 text-left text-xs hover:bg-accent", current === s.p && "bg-accent")}>
+											<span className="font-mono text-study">{i + 1}</span>
+											<span>
+												{s.rel && <span className="text-muted-foreground">{relKo(s.rel)}: </span>}
+												<MathText text={L(s.x)} />
+											</span>
 										</button>
+									</li>
+								))}
+							</ol>
+						</div>
+					)}
+					{terms.length > 0 && (
+						<div>
+							<div className="rail-label">용어</div>
+							<ul className="space-y-1.5">
+								{terms.slice(0, 14).map((t, i) => (
+									<li key={i} className="text-xs leading-snug">
+										<button className="font-semibold hover:underline" onClick={() => jump(t.src)}>
+											{t.term}
+										</button>
+										<span className="text-muted-foreground"> · </span>
+										<MathText text={L(t.x)} className="text-muted-foreground" />
 									</li>
 								))}
 							</ul>
 						</div>
-						{curPart && (
-							<div className="rounded-lg border bg-card p-2.5">
-								<div className="text-[11px] font-semibold tracking-wide text-muted-foreground">이 부분의 주장</div>
-								<div className="mt-0.5 text-[13px] leading-snug">
-									<MathText text={L(curPart.claim) || L(curPart.role)} />
-								</div>
-								{curPart.claim_p && (
-									<button className="mt-1 text-[11px] text-primary hover:underline" onClick={() => jump(curPart.claim_p!)}>
-										{curPart.claim_p}에서
-									</button>
-								)}
-							</div>
-						)}
-						{flow.length > 0 && (
-							<div>
-								<div className="mb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">추론 단계</div>
-								<ol className="space-y-1">
-									{flow.map((s, i) => (
-										<li key={i}>
-											<button onClick={() => jump(s.p)} className={cn("flex w-full gap-1.5 rounded px-1.5 py-1 text-left text-xs hover:bg-accent", current === s.p && "bg-accent")}>
-												<span className="font-mono text-muted-foreground">{i + 1}</span>
-												<span>
-													{s.rel && <span className="text-muted-foreground">{relKo(s.rel)}: </span>}
-													<MathText text={L(s.x)} />
-												</span>
-											</button>
-										</li>
-									))}
-								</ol>
-							</div>
-						)}
-						{terms.length > 0 && (
-							<div>
-								<div className="mb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">용어</div>
-								<ul className="space-y-1">
-									{terms.slice(0, 14).map((t, i) => (
-										<li key={i} className="text-xs">
-											<button className="font-medium hover:underline" onClick={() => jump(t.src)}>
-												{t.term}
-											</button>
-											<span className="text-muted-foreground">: </span>
-											<MathText text={L(t.x)} className="text-muted-foreground" />
-										</li>
-									))}
-								</ul>
-							</div>
-						)}
+					)}
+					<div className="mt-auto space-y-1.5 text-[11px] text-muted-foreground">
 						<div>
-							<div className="mb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">진행</div>
-							<div className="h-1.5 overflow-hidden rounded bg-muted">
-								<div className="h-full bg-study" style={{ width: `${closeIds.length ? (readClose / closeIds.length) * 100 : 0}%` }} />
-							</div>
-							<div className="mt-1 text-[11px] text-muted-foreground">
-								정독 {readClose}/{closeIds.length} · j/k 다음·이전 정독, s 정독 전환, e 원문 펼치기, p PDF
-							</div>
+							정독 {readClose}/{closeIds.length}
 						</div>
-					</aside>
-				</ResizablePanel>
-				<ResizableHandle />
-				<ResizablePanel defaultSize={side ? "50%" : "80%"} minSize="35%">
-					<div ref={scroller} className="h-full overflow-y-auto" data-testid="reader-stream">
-						<div className="mx-auto max-w-3xl px-4 pt-6 pb-40">
-							<h1 className="orig text-2xl leading-snug font-semibold">{title}</h1>
-							<div className="mt-1 text-xs text-muted-foreground">{[L(meta.author), L(meta.source)].filter(Boolean).join(" · ")}</div>
-							<div className="mt-4 rounded-xl bg-primary/8 p-4">
-								<div className="text-[11px] font-semibold tracking-wide text-primary">한 문장 결론</div>
-								<div className="mt-1 text-[1.05rem] leading-relaxed font-medium" data-testid="thesis">
-									<MathText text={L(data.thesis)} />
-								</div>
-								<div className="mt-2 text-sm leading-relaxed text-muted-foreground">
-									<MathText text={L(data.overview)} />
-								</div>
-							</div>
-							<div className="mt-4">
-								<ArgumentMap
-									data={data}
-									current={curPart?.id}
-									onPick={(pid) => {
-										const p = data.parts.find((x) => x.id === pid);
-										if (p) jump(paraIds.find((id) => inRange(p.range, id)) ?? paraIds[0]);
-									}}
-								/>
-							</div>
-							{data.questions.length > 0 && (
-								<div className="mt-4 rounded-xl border p-4">
-									<div className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
-										<BookMarked className="size-4" /> 내 질문과 답
-									</div>
-									<div className="space-y-3">
-										{data.questions.map((qq, i) => (
-											<div key={i} className="text-sm">
-												<div className="font-medium">
-													<MathText text={L(qq.q)} />
-												</div>
-												<div className="mt-0.5 text-muted-foreground">
-													<MathText text={L(qq.a)} />
-												</div>
-												<div className="mt-1 flex gap-1">
-													{qq.p.map((p) => (
-														<Badge key={p} variant="outline" className="cursor-pointer" onClick={() => jump(p)}>
-															{p}
-														</Badge>
-													))}
-												</div>
-											</div>
-										))}
-									</div>
-								</div>
-							)}
-							{data.check.errors.length > 0 && (
-								<p className="mt-3 text-xs text-amber-700 dark:text-amber-400">검증에서 해결하지 못한 항목 {data.check.errors.length}개가 있습니다. 해당 문단에 "검증 실패" 표시가 붙어 있습니다.</p>
-							)}
-							<div className="mt-2 space-y-1">{stream}</div>
+						<div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+							<span>
+								<Kbd keys="j" /> <Kbd keys="k" /> 정독 이동
+							</span>
+							<span>
+								<Kbd keys="s" /> 전환
+							</span>
+							<span>
+								<Kbd keys="e" /> 원문
+							</span>
+							<span>
+								<Kbd keys="p" /> PDF
+							</span>
 						</div>
 					</div>
-				</ResizablePanel>
-				{side && (
-					<>
-						<ResizableHandle />
-						<ResizablePanel defaultSize="30%" minSize="20%">
-							<Tabs value={side} onValueChange={(v) => setSide(v as typeof side)} className="flex h-full flex-col gap-0">
-								<TabsList className="m-2 grid w-auto grid-cols-3">
-									<TabsTrigger value="pdf">PDF</TabsTrigger>
-									<TabsTrigger value="chat">질문</TabsTrigger>
-									<TabsTrigger value="notes">메모 {payload.annotations.length ? `(${payload.annotations.length})` : ""}</TabsTrigger>
-								</TabsList>
-								<TabsContent value="pdf" className="min-h-0 flex-1">
-									<PdfPane url={payload.pdfUrl} page={curItem?.page ?? 1} bbox={curItem?.bbox} pageCount={data.doc.page_count} />
-								</TabsContent>
-								<TabsContent value="chat" className="min-h-0 flex-1">
-									<ChatPanel docId={docId} pid={current} seed={chatSeed} onSeedUsed={() => setChatSeed(null)} />
-								</TabsContent>
-								<TabsContent value="notes" className="min-h-0 flex-1 overflow-y-auto p-3">
-									<NotesList
-										annos={payload.annotations}
-										onJump={(a) => a.resolved && jump(a.resolved.pid)}
-										onDelete={async (a) => {
-											await api.deleteAnnotation({ docId, id: a.id });
-											qc.invalidateQueries({ queryKey: ["reader", docId] });
-										}}
-										orphans={orphans}
-									/>
-								</TabsContent>
-							</Tabs>
-						</ResizablePanel>
-					</>
-				)}
-			</ResizablePanelGroup>
+				</nav>
+
+				<ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
+					<ResizablePanel defaultSize={side ? "66%" : "100%"} minSize="40%">
+						<div ref={scroller} className="h-full overflow-y-auto" data-testid="reader-stream">
+							<div className="reader-page @container mx-auto max-w-[68rem] px-8 pt-9 pb-40">
+								<div className="text-xs font-semibold tracking-[0.08em] text-study uppercase">{L(meta.genre)}</div>
+								<h1 className="font-display mt-2 max-w-4xl text-[2.15rem] leading-[1.18] font-semibold tracking-[-0.01em]">{title}</h1>
+								<div className="mt-2 text-[13px] text-muted-foreground">
+									{[L(meta.author), L(meta.source)].filter(Boolean).join(" · ")} · {data.doc.page_count}쪽 · 문단 {paraIds.length}개 중 정독 {closeIds.length}개
+								</div>
+								<section className="mt-7 rounded-2xl border-l-4 border-study bg-sidebar px-8 py-6">
+									<div className="text-[11px] font-bold tracking-[0.06em] text-study">한 문장 결론</div>
+									<div className="font-display mt-2 text-[1.3rem] leading-[1.55] font-medium" data-testid="thesis">
+										<MathText text={L(data.thesis)} />
+									</div>
+									<div className="mt-3 max-w-3xl text-[0.95rem] leading-[1.75] text-muted-foreground">
+										<MathText text={L(data.overview)} />
+									</div>
+								</section>
+								<Collapsible defaultOpen className="mt-6">
+									<CollapsibleTrigger className="group flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground hover:text-foreground">
+										<ChevronRight className="size-3.5 transition group-data-[state=open]:rotate-90" /> 논증 지도
+									</CollapsibleTrigger>
+									<CollapsibleContent className="mt-2">
+										<ArgumentMap
+											data={data}
+											current={curPart?.id}
+											onPick={(pid) => {
+												const p = data.parts.find((x) => x.id === pid);
+												if (p) jump(paraIds.find((id) => inRange(p.range, id)) ?? paraIds[0]);
+											}}
+										/>
+									</CollapsibleContent>
+								</Collapsible>
+								{data.questions.length > 0 && (
+									<div className="mt-6 rounded-2xl border p-5">
+										<div className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
+											<BookMarked className="size-4 text-study" /> 내 질문과 답
+										</div>
+										<div className="space-y-4">
+											{data.questions.map((qq, i) => (
+												<div key={i} className="text-sm">
+													<div className="font-medium">
+														<MathText text={L(qq.q)} />
+													</div>
+													<div className="mt-0.5 leading-relaxed text-muted-foreground">
+														<MathText text={L(qq.a)} />
+													</div>
+													<div className="mt-1.5 flex gap-1">
+														{qq.p.map((p) => (
+															<Badge key={p} variant="outline" className="cursor-pointer font-mono" onClick={() => jump(p)}>
+																{p}
+															</Badge>
+														))}
+													</div>
+												</div>
+											))}
+										</div>
+									</div>
+								)}
+								{data.check.errors.length > 0 && (
+									<p className="mt-4 text-xs text-amber-700 dark:text-amber-400">검증에서 해결하지 못한 항목 {data.check.errors.length}개가 있습니다. 해당 문단에 "검증 실패" 표시가 붙어 있습니다.</p>
+								)}
+								<div className="reader-stream mt-2">{stream}</div>
+							</div>
+						</div>
+					</ResizablePanel>
+					{side && (
+						<>
+							<ResizableHandle />
+							<ResizablePanel defaultSize="34%" minSize="22%">
+								<aside className="flex h-full flex-col bg-sidebar">
+									<div className="flex items-center justify-between gap-2 px-3 pt-2">
+										<TabList value={side} onChange={(v) => setSide(v as typeof side)} size="sm">
+											{sideTabs.map((t) => (
+												<Tab key={t.key} value={t.key} label={t.label} />
+											))}
+										</TabList>
+										<IconButton variant="ghost" size="sm" label="닫기" icon={<Icon icon={X} />} onClick={() => setSide(null)} />
+									</div>
+									<div className="min-h-0 flex-1">
+										{side === "pdf" && <PdfPane url={payload.pdfUrl} page={curItem?.page ?? 1} bbox={curItem?.bbox} pageCount={data.doc.page_count} />}
+										{side === "chat" && <ChatPanel docId={docId} pid={current} seed={chatSeed} onSeedUsed={() => setChatSeed(null)} />}
+										{side === "notes" && (
+											<div className="h-full overflow-y-auto p-3">
+												<NotesList
+													annos={payload.annotations}
+													onJump={(a) => a.resolved && jump(a.resolved.pid)}
+													onDelete={async (a) => {
+														await api.deleteAnnotation({ docId, id: a.id });
+														qc.invalidateQueries({ queryKey: ["reader", docId] });
+													}}
+													orphans={orphans}
+												/>
+											</div>
+										)}
+									</div>
+								</aside>
+							</ResizablePanel>
+						</>
+					)}
+				</ResizablePanelGroup>
+			</div>
 
 			{sel && (
 				<div className="fixed z-50 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-lg border bg-popover p-1 shadow-lg" style={{ left: sel.x, top: sel.y - 6 }} onMouseUp={(e) => e.stopPropagation()}>

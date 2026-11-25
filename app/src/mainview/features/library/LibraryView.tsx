@@ -123,7 +123,7 @@ export function LibraryView() {
 		<div className="flex h-full flex-col">
 			<header className="flex items-center gap-3 border-b px-6 py-4">
 				<div>
-					<h1 className="text-lg font-semibold">라이브러리</h1>
+					<h1 className="font-display text-2xl font-semibold">라이브러리</h1>
 					<p className="text-xs text-muted-foreground">
 						논문 {docs.data?.length ?? 0}편 · {apiBilling ? `누적 API 비용 $${total.toFixed(2)}` : `누적 ${fmtTokens(totalTokens)} 토큰 (${settings.data?.llmBackend === "ollama" ? "Ollama" : "Claude 구독"})`}
 					</p>

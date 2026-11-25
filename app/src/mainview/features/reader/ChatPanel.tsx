@@ -43,7 +43,10 @@ export function ChatPanel({ docId, pid, seed, onSeedUsed }: { docId: string; pid
 		[],
 	);
 
-	useEffect(() => end.current?.scrollIntoView({ block: "end" }), [msgs]);
+	useEffect(() => {
+		// braces: newer engines return a Promise from scrollIntoView, and an effect must not return one
+		end.current?.scrollIntoView({ block: "end" });
+	}, [msgs]);
 
 	const send = async () => {
 		const q = input.trim();

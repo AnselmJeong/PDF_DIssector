@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookOpenText, Clock, FlaskConical, Library as LibraryIcon, Loader2, Moon, PauseCircle, Settings as SettingsIcon, Sun } from "lucide-react";
 import { toast } from "sonner";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
 import { cn } from "@/lib/utils";
 import { api, on } from "@/lib/rpc";
 import { useApp } from "@/lib/store";
@@ -57,11 +59,43 @@ export default function App() {
 
 	return (
 		<div className="flex h-full">
-			<aside className="flex w-56 shrink-0 flex-col border-r bg-sidebar">
-				<div className="flex items-center gap-2 px-4 pt-4 pb-3">
-					<FlaskConical className="size-5 text-primary" />
+			{view.name === "reader" ? (
+				// while reading, the app nav folds into a slim icon rail so the page gets the room
+				<aside className="flex w-14 shrink-0 flex-col items-center gap-1 border-r bg-sidebar py-3">
+					<FlaskConical className="mb-2 size-5 text-primary" />
+					{nav.map((n) => (
+						<IconButton key={n.key} size="sm" variant={n.active ? "secondary" : "ghost"} label={n.label} tooltip={n.label} icon={<Icon icon={n.icon} />} onClick={n.onClick} />
+					))}
+					{processing.length > 0 && (
+						<IconButton size="sm" variant="ghost" label={`처리 중 ${processing.length}개`} tooltip={`처리 중 ${processing.length}개`} icon={<Icon icon={Loader2} />} onClick={() => go({ name: "processing", docId: processing[0].id })} />
+					)}
+					<div className="my-1 h-px w-6 bg-border" />
+					{(docs.data ?? [])
+						.filter((d) => d.status === "done" || d.status === "needs_review")
+						.slice(0, 8)
+						.map((d) => (
+							<IconButton
+								key={d.id}
+								size="sm"
+								variant={view.docId === d.id ? "secondary" : "ghost"}
+								label={d.title}
+								tooltip={d.title}
+								icon={<Icon icon={BookOpenText} />}
+								onClick={() => go({ name: "reader", docId: d.id })}
+							/>
+						))}
+					<div className="mt-auto">
+						<IconButton size="sm" variant="ghost" label={dark ? "밝은 화면" : "어두운 화면"} tooltip={dark ? "밝은 화면" : "어두운 화면"} icon={<Icon icon={dark ? Sun : Moon} />} onClick={toggleDark} />
+					</div>
+				</aside>
+			) : (
+			<aside className="flex w-60 shrink-0 flex-col border-r bg-sidebar">
+				<div className="flex items-center gap-2.5 px-4 pt-5 pb-4">
+					<span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
+						<FlaskConical className="size-4.5" />
+					</span>
 					<div>
-						<div className="text-sm font-semibold leading-tight">PDF Dissector</div>
+						<div className="font-display text-[15px] font-semibold leading-tight">PDF Dissector</div>
 						<div className="text-[11px] text-muted-foreground">논문 정독 가이드</div>
 					</div>
 				</div>
@@ -76,7 +110,7 @@ export default function App() {
 						</button>
 					))}
 				</nav>
-				<div className="mt-4 px-4 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">처리 중</div>
+				<div className="mt-4 px-4 text-[11px] font-semibold tracking-wide text-muted-foreground">처리 중</div>
 				<div className="flex flex-col gap-0.5 px-2 pt-1">
 					{processing.length === 0 && <div className="px-2.5 py-1 text-xs text-muted-foreground">없음</div>}
 					{processing.map((d) => (
@@ -102,7 +136,7 @@ export default function App() {
 						</button>
 					))}
 				</div>
-				<div className="mt-4 px-4 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">최근 읽은 논문</div>
+				<div className="mt-4 px-4 text-[11px] font-semibold tracking-wide text-muted-foreground">최근 읽은 논문</div>
 				<div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pt-1">
 					{(docs.data ?? [])
 						.filter((d) => d.status === "done" || d.status === "needs_review")
@@ -111,10 +145,7 @@ export default function App() {
 							<button
 								key={d.id}
 								onClick={() => go({ name: "reader", docId: d.id })}
-								className={cn(
-									"flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs hover:bg-accent",
-									view.name === "reader" && view.docId === d.id && "bg-accent",
-								)}
+								className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs hover:bg-accent"
 							>
 								<BookOpenText className="size-3.5 shrink-0" />
 								<span className="truncate">{d.title}</span>
@@ -125,6 +156,7 @@ export default function App() {
 					{dark ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />} {dark ? "밝은 화면" : "어두운 화면"}
 				</button>
 			</aside>
+			)}
 			<main className="min-w-0 flex-1">
 				{view.name === "library" && <LibraryView />}
 				{view.name === "processing" && <ProcessingView docId={view.docId} />}
