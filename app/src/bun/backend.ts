@@ -13,7 +13,7 @@ import * as P from "./llm/prompts";
 import * as S from "./llm/schemas";
 import { locateEngine, PdfxBridge } from "./pipeline/bridge";
 import { SecretStore } from "./secrets";
-import { OllamaClient } from "./llm/ollama";
+import { listOllamaModels, OllamaClient } from "./llm/ollama";
 
 type Handlers = { [K in keyof BunRequests]: (p: BunRequests[K]["params"]) => Promise<BunRequests[K]["response"]> };
 
@@ -387,6 +387,13 @@ export function createBackend(pf: Platform) {
 		async setApiKey({ key }) {
 			secrets.set(key && key.trim() ? key.trim() : null);
 			return { ok: true, hasApiKey: secrets.has() };
+		},
+		async listOllamaModels() {
+			try {
+				return { models: await listOllamaModels(lib.settings().ollama.baseUrl, ollamaSecrets.get()) };
+			} catch (e) {
+				return { models: [], error: (e as Error).message };
+			}
 		},
 		async setOllamaKey({ key }) {
 			ollamaSecrets.set(key && key.trim() ? key.trim() : null);

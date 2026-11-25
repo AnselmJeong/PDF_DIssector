@@ -329,6 +329,7 @@ export type BunRequests = {
 	getSettings: { params: Record<string, never>; response: Settings & { hasApiKey: boolean; hasOllamaKey: boolean; engineOk: boolean; engineInfo: string; claudeOk: boolean; claudeInfo: string } };
 	setSettings: { params: { settings: Partial<Settings> }; response: { ok: true } };
 	setApiKey: { params: { key: string | null }; response: { ok: true; hasApiKey: boolean } };
+	listOllamaModels: { params: Record<string, never>; response: { models: string[]; error?: string } };
 	setOllamaKey: { params: { key: string | null }; response: { ok: true; hasOllamaKey: boolean } };
 	listRules: { params: Record<string, never>; response: UserRule[] };
 	addRule: { params: { scope: UserRule["scope"]; text: string }; response: UserRule };

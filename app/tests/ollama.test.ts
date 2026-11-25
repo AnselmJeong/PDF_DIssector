@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { OllamaClient, parseJsonReply } from "../src/bun/llm/ollama";
+import { listOllamaModels, OllamaClient, parseJsonReply } from "../src/bun/llm/ollama";
 import { createBackend } from "../src/bun/backend";
 
 const sse = (events: unknown[]) =>
@@ -113,4 +113,22 @@ test("backend: ollama settings, key storage and readiness", async () => {
 	expect(s.hasOllamaKey).toBe(true);
 	expect(s.hasApiKey).toBe(false); // separate from the Anthropic key
 	expect((await h.setOllamaKey({ key: null })).hasOllamaKey).toBe(false);
+});
+
+test("listOllamaModels: /v1/models, then /api/tags fallback", async () => {
+	const urls: string[] = [];
+	const cloud = (async (url: string, init: RequestInit) => {
+		urls.push(url);
+		expect((init.headers as Record<string, string>).authorization).toBe("Bearer k");
+		return Response.json({ object: "list", data: [{ id: "kimi-k3" }, { id: "glm-5.3" }, { id: "glm-5.3" }] });
+	}) as unknown as typeof fetch;
+	expect(await listOllamaModels("https://ollama.com/v1/", "k", cloud)).toEqual(["glm-5.3", "kimi-k3"]);
+	expect(urls).toEqual(["https://ollama.com/v1/models"]);
+
+	const local = (async (url: string) =>
+		url.endsWith("/v1/models") ? new Response("nope", { status: 404 }) : Response.json({ models: [{ name: "llama3:8b" }] })) as unknown as typeof fetch;
+	expect(await listOllamaModels("http://localhost:11434/v1", null, local)).toEqual(["llama3:8b"]);
+
+	const down = (async () => new Response("bad", { status: 401 })) as unknown as typeof fetch;
+	await expect(listOllamaModels("https://ollama.com/v1", "x", down)).rejects.toThrow("불러오지 못했습니다");
 });

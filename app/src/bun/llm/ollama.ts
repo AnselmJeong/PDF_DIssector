@@ -188,3 +188,30 @@ export class OllamaClient {
 		return { value: text, text, usage, stopReason: finish };
 	}
 }
+
+/** Model ids the server offers: OpenAI-style GET {base}/models, falling back to Ollama's native /api/tags. */
+export async function listOllamaModels(baseUrl: string, apiKey: string | null, fetchImpl: typeof fetch = fetch): Promise<string[]> {
+	const base = baseUrl.trim().replace(/\/+$/, "") || OLLAMA_CLOUD_URL;
+	const headers: Record<string, string> = apiKey ? { authorization: `Bearer ${apiKey}` } : {};
+	const get = async (url: string) => {
+		const res = await fetchImpl(url, { headers, signal: AbortSignal.timeout(15_000) });
+		if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+		return (await res.json()) as { data?: { id?: string }[]; models?: { name?: string; model?: string }[] };
+	};
+	let ids: string[] = [];
+	let err: Error | null = null;
+	try {
+		ids = ((await get(`${base}/models`)).data ?? []).map((m) => m.id ?? "").filter(Boolean);
+	} catch (e) {
+		err = e as Error;
+	}
+	if (!ids.length && /\/v1$/.test(base)) {
+		try {
+			ids = ((await get(`${base.replace(/\/v1$/, "")}/api/tags`)).models ?? []).map((m) => m.name ?? m.model ?? "").filter(Boolean);
+		} catch (e) {
+			err ??= e as Error;
+		}
+	}
+	if (!ids.length && err) throw new LlmError(`Ollama 모델 목록을 불러오지 못했습니다: ${err.message}`);
+	return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
+}

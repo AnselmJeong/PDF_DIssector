@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, KeyRound, Plus, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, KeyRound, Loader2, Plus, RefreshCw, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +23,13 @@ export function SettingsView() {
 	const qc = useQueryClient();
 	const s = useQuery({ queryKey: ["settings"], queryFn: () => api.getSettings({}) });
 	const rules = useQuery({ queryKey: ["rules"], queryFn: () => api.listRules({}) });
+	const ollamaOn = s.data?.llmBackend === "ollama";
+	const omodels = useQuery({
+		queryKey: ["ollamaModels", s.data?.ollama.baseUrl, s.data?.hasOllamaKey],
+		queryFn: () => api.listOllamaModels({}),
+		enabled: ollamaOn,
+		staleTime: 5 * 60 * 1000,
+	});
 	const [key, setKey] = useState("");
 	const [okey, setOkey] = useState("");
 	const [rule, setRule] = useState("");
@@ -152,20 +159,26 @@ export function SettingsView() {
 								/>
 							</div>
 							<div className="grid grid-cols-[120px_1fr] items-center gap-3">
-								<Label htmlFor="ollama-model">모델 이름</Label>
-								<Input
-									id="ollama-model"
-									key={`model-${st.ollama.model}`}
-									defaultValue={st.ollama.model}
-									placeholder="예: kimi-k3, glm-5.3, gpt-oss:120b"
-									onBlur={(e) => {
-										const v = e.target.value.trim();
-										if (v !== st.ollama.model) save({ ollama: { ...st.ollama, model: v } });
-									}}
-									className="font-mono text-xs"
-									data-testid="ollama-model"
-								/>
+								<Label>모델</Label>
+								<div className="flex items-center gap-2">
+									<Select value={st.ollama.model || undefined} onValueChange={(v) => save({ ollama: { ...st.ollama, model: v as string } })}>
+										<SelectTrigger className="w-full font-mono text-xs" data-testid="ollama-model">
+											<SelectValue placeholder={omodels.isFetching ? "모델 목록을 불러오는 중…" : "모델을 고르세요"} />
+										</SelectTrigger>
+										<SelectContent>
+											{(st.ollama.model && !(omodels.data?.models ?? []).includes(st.ollama.model) ? [st.ollama.model, ...(omodels.data?.models ?? [])] : (omodels.data?.models ?? [])).map((m) => (
+												<SelectItem key={m} value={m} className="font-mono text-xs">
+													{m}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<Button variant="outline" size="icon" title="모델 목록 새로고침" onClick={() => omodels.refetch()} disabled={omodels.isFetching} data-testid="ollama-refresh">
+										{omodels.isFetching ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+									</Button>
+								</div>
 							</div>
+							{omodels.data?.error && <div className="text-xs text-destructive">{omodels.data.error}</div>}
 							<div className="grid grid-cols-[120px_1fr] items-center gap-3">
 								<Label>API 키</Label>
 								<div className="flex items-center gap-2">
