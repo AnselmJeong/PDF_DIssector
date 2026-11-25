@@ -46,6 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	fastMode: false,
 	threeTierView: false,
 	concurrency: 3,
+	parallelDocs: 2,
 	acceptedDataNotice: false,
 	pythonPath: null,
 };

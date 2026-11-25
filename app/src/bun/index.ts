@@ -84,6 +84,6 @@ win = new BrowserWindow({
 });
 
 Electrobun.events.on("before-quit", () => {
-	backend.bridge.stop();
+	backend.stop();
 	server.stop();
 });

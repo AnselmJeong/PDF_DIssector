@@ -31,14 +31,19 @@ export function createBackend(pf: Platform) {
 	const lib = new Library(join(pf.dataDir, "library.sqlite"));
 	const secrets = new SecretStore(pf.dataDir);
 	let engineInfo = "";
+	// Two engine processes: the `serve` process answers one request at a time, so background jobs get
+	// their own (jobBridge) and the reader/brief dialog (bridge) never wait behind a long pipeline step.
 	let bridge: PdfxBridge;
+	let jobBridge: PdfxBridge;
 	try {
 		const loc = locateEngine({ pythonOverride: lib.settings().pythonPath, resourcesDir: pf.resourcesDir });
 		bridge = new PdfxBridge(loc);
+		jobBridge = new PdfxBridge(loc);
 		engineInfo = `${loc.python} | ${loc.engineDir}`;
 	} catch (e) {
 		engineInfo = (e as Error).message;
 		bridge = new PdfxBridge({ python: "python3", engineDir: "." });
+		jobBridge = new PdfxBridge({ python: "python3", engineDir: "." });
 	}
 
 	let refsCache: P.References | null = null;
@@ -76,14 +81,15 @@ export function createBackend(pf: Platform) {
 
 	const runner = new JobRunner({
 		lib,
-		bridge,
+		bridge: jobBridge,
 		llm: llmFor,
 		refs,
 		settings: () => lib.settings(),
 		emit: {
 			progress: (m) => {
-				pf.send("jobProgress", m);
+				pf.send("jobProgress", { ...m, progress: runner.progressOf(m.docId)?.progress ?? undefined });
 			},
+			changed: () => pf.send("docsChanged", {}),
 			done: (m) => {
 				pf.send("jobDone", m);
 				pf.send("docsChanged", {});
@@ -208,7 +214,6 @@ export function createBackend(pf: Platform) {
 		async startJob({ docId, from }) {
 			const notReady = llmReady();
 			if (notReady) throw new Error(notReady);
-			lib.updateDocument(docId, { status: "queued" });
 			return { jobId: runner.start(docId, from) };
 		},
 		async cancelJob({ docId }) {
@@ -235,7 +240,10 @@ export function createBackend(pf: Platform) {
 			return { ok: true };
 		},
 		async listDocs({ query, filters }) {
-			return lib.listDocs(query, filters);
+			return lib.listDocs(query, filters).map((d) => {
+				const p = runner.progressOf(d.id);
+				return { ...d, progress: p?.progress ?? null, progressMsg: p?.msg ?? null, queuePosition: runner.queuePosition(d.id) };
+			});
 		},
 		async deleteDoc({ docId }) {
 			runner.cancel(docId);
@@ -420,8 +428,19 @@ export function createBackend(pf: Platform) {
 		return abs.startsWith(root) ? `/files/${docId}/${abs.slice(root.length + 1)}` : abs;
 	}
 
+	// Jobs live in memory: papers that were queued or processing when the app quit start again
+	// (from their last finished stage) the next time it opens.
+	for (const d of lib.listDocs()) {
+		if (d.status === "queued" || d.status === "processing") runner.start(d.id);
+	}
+
+	const stop = () => {
+		bridge.stop();
+		jobBridge.stop();
+	};
+
 	const setServer = (origin: string, token: string) => Object.assign(server, { origin, token });
-	return { handlers, setServer, lib, bridge, runner, serveFile, importPdfBytes, cropUrl, settingsDefault: DEFAULT_SETTINGS, readFileSync };
+	return { handlers, setServer, lib, bridge, jobBridge, stop, runner, serveFile, importPdfBytes, cropUrl, settingsDefault: DEFAULT_SETTINGS, readFileSync };
 }
 
 export type Backend = ReturnType<typeof createBackend>;

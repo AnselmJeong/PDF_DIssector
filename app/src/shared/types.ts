@@ -71,6 +71,11 @@ export interface DocSummary {
 	updatedAt: string;
 	error: string | null;
 	fileName: string;
+	/** While processing: overall progress 0..1 and the latest step message. */
+	progress?: number | null;
+	progressMsg?: string | null;
+	/** While queued: 1-based place in the waiting line. */
+	queuePosition?: number | null;
 }
 
 export interface DocFilter {
@@ -95,6 +100,7 @@ export interface JobState {
 	docId: string;
 	jobId: string | null;
 	running: boolean;
+	queuePosition: number | null; // 1-based place in the waiting line while queued
 	stages: StageRecord[];
 	overlays: { page: number; path: string }[];
 	fixes: FixOp[];
@@ -134,6 +140,7 @@ export interface Settings {
 	fastMode: boolean; // second read on the helper model, skip the equation/figure deep-dive
 	threeTierView: boolean;
 	concurrency: number;
+	parallelDocs: number; // how many papers are processed at the same time; the rest wait in a queue
 	acceptedDataNotice: boolean;
 	pythonPath: string | null;
 }
@@ -327,7 +334,7 @@ export type BunRequests = {
 }
 
 export type WebviewMessages = {
-	jobProgress: { docId: string; stage: Stage; status: StageRecord["status"]; pct: number; msg: string; tokens: number; costUsd: number };
+	jobProgress: { docId: string; stage: Stage; status: StageRecord["status"]; pct: number; msg: string; tokens: number; costUsd: number; progress?: number };
 	jobDone: { docId: string; ok: boolean; error?: string };
 	chatDelta: { streamId: string; text: string; done: boolean; error?: string };
 	docsChanged: Record<string, never>;

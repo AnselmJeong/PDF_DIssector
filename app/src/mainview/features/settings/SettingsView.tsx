@@ -156,6 +156,10 @@ export function SettingsView() {
 							<Label htmlFor="conc">문단 해설 동시 호출 수</Label>
 							<Input id="conc" type="number" min={1} max={6} defaultValue={st.concurrency} onBlur={(e) => save({ concurrency: Math.min(6, Math.max(1, Number(e.target.value) || 3)) })} className="w-32" />
 						</div>
+						<div className="grid grid-cols-[220px_1fr] items-center gap-3">
+							<Label htmlFor="pdocs">동시에 처리할 논문 수</Label>
+							<Input id="pdocs" type="number" min={1} max={4} defaultValue={st.parallelDocs} onBlur={(e) => save({ parallelDocs: Math.min(4, Math.max(1, Number(e.target.value) || 2)) })} className="w-32" />
+						</div>
 						<div className="flex items-center justify-between rounded-lg border p-3">
 							<div>
 								<div className="text-sm font-medium">빠른 모드</div>

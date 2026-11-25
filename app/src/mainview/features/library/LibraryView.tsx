@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, BookOpenText, FileUp, Loader2, MoreHorizontal, Play, RotateCcw, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, BookOpenText, Clock, FileUp, Loader2, MoreHorizontal, Play, RotateCcw, Search, Square, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -240,7 +240,7 @@ function DocRow({ d }: { d: DocSummary }) {
 		try {
 			await api.startJob({ docId: d.id });
 			qc.invalidateQueries({ queryKey: ["docs"] });
-			go({ name: "processing", docId: d.id });
+			toast.success("처리 대기열에 넣었습니다");
 		} catch (e) {
 			toast.error((e as Error).message);
 		}
@@ -264,9 +264,11 @@ function DocRow({ d }: { d: DocSummary }) {
 			<TableCell>
 				<Badge className={cn("border-0", st.cls)}>
 					{d.status === "processing" && <Loader2 className="animate-spin" />}
+					{d.status === "queued" && <Clock />}
 					{st.label}
+					{d.status === "queued" && d.queuePosition ? ` (${d.queuePosition}번째)` : ""}
 				</Badge>
-				{d.status === "processing" && <div className="mt-1 text-[11px] text-muted-foreground">{STAGE_LABEL[d.stage]}</div>}
+				{d.status === "processing" && <JobProgress d={d} />}
 				{d.status === "failed" && d.error && <div className="mt-1 line-clamp-2 max-w-56 text-[11px] text-destructive">{d.error}</div>}
 			</TableCell>
 			<TableCell className="text-right text-xs">{d.closeShare != null ? `${Math.round(d.closeShare * 100)}%` : "-"}</TableCell>
@@ -294,6 +296,11 @@ function DocRow({ d }: { d: DocSummary }) {
 							</DropdownMenuItem>
 						)}
 						{d.status === "imported" && <DropdownMenuItem onClick={() => setBriefFor([d.id])}>브리핑하고 시작</DropdownMenuItem>}
+						{(d.status === "processing" || d.status === "queued") && (
+							<DropdownMenuItem onClick={() => api.cancelJob({ docId: d.id }).then(() => qc.invalidateQueries({ queryKey: ["docs"] }))}>
+								<Square /> {d.status === "queued" ? "대기 취소" : "처리 취소"}
+							</DropdownMenuItem>
+						)}
 						<DropdownMenuSeparator />
 						<DropdownMenuItem className="text-destructive" onClick={del}>
 							<Trash2 /> 삭제
@@ -302,5 +309,22 @@ function DocRow({ d }: { d: DocSummary }) {
 				</DropdownMenu>
 			</TableCell>
 		</TableRow>
+	);
+}
+
+/** Per-paper progress while processing: a thin bar, the current stage and its latest message. */
+function JobProgress({ d }: { d: DocSummary }) {
+	const pct = Math.round((d.progress ?? 0) * 100);
+	return (
+		<div className="mt-1.5 w-44" data-testid={`progress-${d.id}`}>
+			<div className="flex items-center justify-between text-[11px] text-muted-foreground">
+				<span className="truncate">{STAGE_LABEL[d.stage]}</span>
+				<span className="tabular-nums">{pct}%</span>
+			</div>
+			<div className="mt-0.5 h-1 overflow-hidden rounded-full bg-secondary">
+				<div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${pct}%` }} />
+			</div>
+			{d.progressMsg && <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{d.progressMsg}</div>}
+		</div>
 	);
 }
