@@ -72,10 +72,12 @@ export function BriefDialog() {
 			await api.setBrief({ docId, brief });
 			await api.startJob({ docId });
 			qc.invalidateQueries({ queryKey: ["docs"] });
-			const multiple = (briefFor?.length ?? 0) > 1;
 			close();
-			if (!multiple) go({ name: "processing", docId });
-			toast.success(useDefaults ? "기본값(전체 논증, 보통 밀도)으로 시작했습니다" : "처리를 시작했습니다");
+			// Processing runs in the background: stay where the user is (reading or browsing the library).
+			toast.success(useDefaults ? "기본값(전체 논증, 보통 밀도)으로 처리 대기열에 넣었습니다" : "처리 대기열에 넣었습니다", {
+				description: "처리되는 동안 다른 논문을 읽을 수 있습니다. 진행 상황은 라이브러리에 표시됩니다.",
+				action: { label: "진행 보기", onClick: () => go({ name: "processing", docId }) },
+			});
 		} catch (e) {
 			toast.error((e as Error).message);
 		} finally {

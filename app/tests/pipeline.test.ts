@@ -146,7 +146,7 @@ test(
 		expect(existsSync(out.path)).toBe(true);
 		const work = new Work(be.lib.doc(docId).workDir);
 		expect(existsSync(work.path("llm_log"))).toBe(false); // replay client writes no logs
-		be.bridge.stop();
+		be.stop();
 	},
 	{ timeout: 180_000 },
 );

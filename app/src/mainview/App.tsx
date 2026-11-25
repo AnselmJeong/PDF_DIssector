@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpenText, FlaskConical, Library as LibraryIcon, Loader2, Moon, Settings as SettingsIcon, Sun } from "lucide-react";
+import { BookOpenText, Clock, FlaskConical, Library as LibraryIcon, Loader2, Moon, Settings as SettingsIcon, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { api, on } from "@/lib/rpc";
@@ -11,6 +11,7 @@ import { ProcessingView } from "@/features/processing/ProcessingView";
 import { ReaderView } from "@/features/reader/ReaderView";
 import { SettingsView } from "@/features/settings/SettingsView";
 import { DataNotice } from "@/features/settings/DataNotice";
+import type { DocSummary } from "../shared/types";
 
 export default function App() {
 	const { view, go, dark, toggleDark } = useApp();
@@ -28,6 +29,10 @@ export default function App() {
 		const offs = [
 			on("docsChanged", () => qc.invalidateQueries({ queryKey: ["docs"] })),
 			on("jobProgress", (m) => {
+				// update the library row in place so its progress bar moves without refetching the list
+				qc.setQueryData<DocSummary[]>(["docs"], (old) =>
+					old?.map((d) => (d.id === m.docId ? { ...d, status: "processing", stage: m.stage, progress: m.progress ?? d.progress, progressMsg: m.msg } : d)),
+				);
 				qc.invalidateQueries({ queryKey: ["job", m.docId] });
 				if (m.status === "done" || m.status === "failed" || m.status === "skipped") qc.invalidateQueries({ queryKey: ["docs"] });
 			}),
@@ -81,8 +86,11 @@ export default function App() {
 								view.name === "processing" && view.docId === d.id && "bg-accent",
 							)}
 						>
-							<Loader2 className="size-3.5 shrink-0 animate-spin" />
+							{d.status === "queued" ? <Clock className="size-3.5 shrink-0 text-muted-foreground" /> : <Loader2 className="size-3.5 shrink-0 animate-spin" />}
 							<span className="truncate">{d.title}</span>
+							<span className="ml-auto shrink-0 text-[10px] text-muted-foreground tabular-nums">
+								{d.status === "queued" ? "대기" : d.progress != null ? `${Math.round(d.progress * 100)}%` : ""}
+							</span>
 						</button>
 					))}
 				</div>

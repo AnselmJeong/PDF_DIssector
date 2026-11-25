@@ -24,6 +24,8 @@ export interface RunnerDeps {
 	emit: {
 		progress: (m: { docId: string; stage: Stage; status: StageRecord["status"]; pct: number; msg: string; tokens: number; costUsd: number }) => void;
 		done: (m: { docId: string; ok: boolean; error?: string }) => void;
+		/** The set of queued/running documents changed. */
+		changed?: () => void;
 	};
 	settings: () => Settings;
 }
@@ -37,8 +39,38 @@ export class JobRunner {
 
 	constructor(private d: RunnerDeps) {}
 
+	/** Documents waiting for a free slot, oldest first. */
+	private queue: { docId: string; jobId: string }[] = [];
+	/** Latest progress of each running document, for the library list. */
+	private live = new Map<string, { stage: Stage; pct: number; msg: string }>();
+
 	isRunning(docId: string) {
 		return this.active.has(docId);
+	}
+
+	isQueued(docId: string) {
+		return this.queue.some((q) => q.docId === docId);
+	}
+
+	/** 1-based place in the waiting line, or null when not waiting. */
+	queuePosition(docId: string) {
+		const i = this.queue.findIndex((q) => q.docId === docId);
+		return i < 0 ? null : i + 1;
+	}
+
+	/** Overall progress of a running document, 0..1, from completed stages plus the current stage's percent. */
+	progressOf(docId: string): { progress: number; msg: string | null } | null {
+		const l = this.live.get(docId);
+		if (!this.active.has(docId)) return null;
+		const steps = STAGES.slice(1); // IMPORTED is done before any job starts
+		const recs = this.d.lib.getStages(docId);
+		const done = steps.filter((s) => recs.some((r) => r.stage === s && (r.status === "done" || r.status === "skipped"))).length;
+		const cur = l && recs.find((r) => r.stage === l.stage)?.status === "running" ? Math.min(1, Math.max(0, l.pct / 100)) : 0;
+		return { progress: Math.min(1, (done + cur) / steps.length), msg: l?.msg ?? null };
+	}
+
+	private maxJobs() {
+		return Math.max(1, Math.min(4, Math.round(this.d.settings().parallelDocs ?? 2)));
 	}
 
 	state(docId: string): JobState {
@@ -63,10 +95,27 @@ export class JobRunner {
 		const overlays = existsSync(work.path("inspect.json")) ? readJson<{ overlays: { page: number; path: string }[] }>(work.path("inspect.json")).overlays : [];
 		const fixes = existsSync(work.path("fixes_all.json")) ? readJson<FixOp[]>(work.path("fixes_all.json")) : [];
 		const findings = existsSync(work.path("findings.json")) ? readJson<Finding[]>(work.path("findings.json")) : [];
-		return { docId, jobId: this.active.get(docId)?.jobId ?? null, running: this.active.has(docId), stages, overlays, fixes, findings };
+		const queued = this.queue.find((q) => q.docId === docId);
+		return {
+			docId,
+			jobId: this.active.get(docId)?.jobId ?? queued?.jobId ?? null,
+			running: this.active.has(docId),
+			queuePosition: this.queuePosition(docId),
+			stages,
+			overlays,
+			fixes,
+			findings,
+		};
 	}
 
 	cancel(docId: string) {
+		const i = this.queue.findIndex((q) => q.docId === docId);
+		if (i >= 0) {
+			this.queue.splice(i, 1);
+			this.d.lib.updateDocument(docId, { status: "canceled", error: null });
+			this.d.emit.done({ docId, ok: false, error: "취소됨" });
+			return;
+		}
 		const a = this.active.get(docId);
 		if (a) {
 			a.canceled = true;
@@ -74,14 +123,36 @@ export class JobRunner {
 		}
 	}
 
+	/**
+	 * Queue a document. At most `parallelDocs` documents run at once; the rest wait as "queued"
+	 * and start in order as slots free up, so the user can keep reading while papers are processed.
+	 */
 	start(docId: string, from?: Stage) {
 		if (this.active.has(docId)) return this.active.get(docId)!.jobId;
+		const waiting = this.queue.find((q) => q.docId === docId);
+		if (waiting) return waiting.jobId;
 		const jobId = crypto.randomUUID();
-		this.active.set(docId, { jobId, canceled: false });
 		if (from) {
 			const k = STAGES.indexOf(from);
 			this.d.lib.clearStagesFrom(docId, STAGES.slice(k) as unknown as Stage[]);
 		}
+		this.queue.push({ docId, jobId });
+		this.d.lib.updateDocument(docId, { status: "queued", error: null });
+		this.pump();
+		return jobId;
+	}
+
+	/** Start waiting documents while there are free slots. */
+	private pump() {
+		while (this.active.size < this.maxJobs() && this.queue.length) {
+			const { docId, jobId } = this.queue.shift()!;
+			this.launch(docId, jobId);
+		}
+		this.d.emit.changed?.();
+	}
+
+	private launch(docId: string, jobId: string) {
+		this.active.set(docId, { jobId, canceled: false });
 		this.d.lib.updateDocument(docId, { status: "processing", error: null });
 		void this.run(docId, jobId)
 			.then(() => this.d.emit.done({ docId, ok: true }))
@@ -90,8 +161,11 @@ export class JobRunner {
 				this.d.lib.updateDocument(docId, { status: canceled ? "canceled" : "failed", error: canceled ? null : e.message });
 				this.d.emit.done({ docId, ok: false, error: canceled ? "취소됨" : e.message });
 			})
-			.finally(() => this.active.delete(docId));
-		return jobId;
+			.finally(() => {
+				this.active.delete(docId);
+				this.live.delete(docId);
+				this.pump();
+			});
 	}
 
 	// ------------------------------------------------------------------
@@ -149,6 +223,7 @@ export class JobRunner {
 
 	private progress(c: Ctx, status: StageRecord["status"], pct: number, msg: string) {
 		const rec = this.d.lib.getStages(c.docId).find((s) => s.stage === c.stage);
+		this.live.set(c.docId, { stage: c.stage, pct, msg });
 		this.d.emit.progress({
 			docId: c.docId,
 			stage: c.stage,

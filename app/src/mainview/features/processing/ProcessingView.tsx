@@ -36,7 +36,7 @@ const dur = (a: string | null, b: string | null) => {
 export function ProcessingView({ docId }: { docId: string }) {
 	const qc = useQueryClient();
 	const { go } = useApp();
-	const job = useQuery({ queryKey: ["job", docId], queryFn: () => api.getJob({ docId }), refetchInterval: (q) => (q.state.data?.running ? 3000 : false) });
+	const job = useQuery({ queryKey: ["job", docId], queryFn: () => api.getJob({ docId }), refetchInterval: (q) => (q.state.data?.running || q.state.data?.queuePosition ? 3000 : false) });
 	const docs = useQuery({ queryKey: ["docs"], queryFn: () => api.listDocs({}) });
 	const doc = docs.data?.find((d) => d.id === docId);
 	const [live, setLive] = useState<{ stage: Stage; pct: number; msg: string } | null>(null);
@@ -52,6 +52,7 @@ export function ProcessingView({ docId }: { docId: string }) {
 	const stages = (job.data?.stages ?? []).filter((s) => s.stage !== "IMPORTED");
 	const doneCount = stages.filter((s) => s.status === "done" || s.status === "skipped").length;
 	const running = job.data?.running;
+	const queuePos = job.data?.queuePosition ?? null;
 	const failed = stages.find((s) => s.status === "failed");
 
 	const resume = async (from?: Stage) => {
@@ -81,9 +82,9 @@ export function ProcessingView({ docId }: { docId: string }) {
 					</div>
 				</div>
 				<div className="ml-auto flex gap-2">
-					{running ? (
-						<Button variant="outline" onClick={() => api.cancelJob({ docId })}>
-							<Square /> 취소
+					{running || queuePos ? (
+						<Button variant="outline" onClick={() => api.cancelJob({ docId }).then(() => qc.invalidateQueries({ queryKey: ["job", docId] }))}>
+							<Square /> {queuePos ? "대기 취소" : "취소"}
 						</Button>
 					) : (
 						<Button variant="outline" onClick={() => resume()}>
@@ -99,6 +100,7 @@ export function ProcessingView({ docId }: { docId: string }) {
 			</header>
 			<div className="px-6 pt-3">
 				<Progress value={(doneCount / Math.max(1, stages.length)) * 100} />
+				{queuePos && !running && <div className="mt-1.5 text-xs text-muted-foreground">다른 논문을 처리하는 중이라 대기열 {queuePos}번째에서 기다리고 있습니다.</div>}
 				{running && live && (
 					<div className="mt-1.5 text-xs text-muted-foreground">
 						{STAGE_LABEL[live.stage]}: {live.msg}
