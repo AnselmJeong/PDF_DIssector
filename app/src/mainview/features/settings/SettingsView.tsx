@@ -38,7 +38,7 @@ export function SettingsView() {
 	return (
 		<div className="h-full overflow-y-auto">
 			<div className="mx-auto max-w-3xl space-y-5 px-6 py-6">
-				<h1 className="text-lg font-semibold">설정</h1>
+				<h1 className="font-display text-2xl font-semibold">설정</h1>
 
 				<Card>
 					<CardHeader>

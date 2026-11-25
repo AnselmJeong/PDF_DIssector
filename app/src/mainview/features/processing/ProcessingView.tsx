@@ -84,7 +84,7 @@ export function ProcessingView({ docId }: { docId: string }) {
 		<div className="flex h-full flex-col">
 			<header className="flex items-start gap-3 border-b px-6 py-4">
 				<div className="min-w-0">
-					<h1 className="truncate text-lg font-semibold">{doc?.title ?? "처리"}</h1>
+					<h1 className="font-display truncate text-xl font-semibold">{doc?.title ?? "처리"}</h1>
 					<div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
 						{doc && <Badge className={cn("border-0", STATUS[doc.status].cls)}>{STATUS[doc.status].label}</Badge>}
 						<span>
