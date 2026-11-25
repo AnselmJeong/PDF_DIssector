@@ -1,6 +1,6 @@
 // The app's main-process services and request handlers. index.ts exposes them over Electrobun RPC;
 // devServer.ts exposes the same handlers over HTTP so the UI can be developed and tested in a browser.
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import type { BunRequests, ReaderData, ReaderEntry, Stage, StoredAnnotation, WebviewMessages } from "../shared/types";
 import { resolveAnnotation } from "./annotations/reanchor";
@@ -189,14 +189,7 @@ export function createBackend(pf: Platform) {
 			const ids: string[] = [];
 			for (const p of paths) {
 				if (!p.toLowerCase().endsWith(".pdf") || !existsSync(p)) continue;
-				const id = newId("d_");
-				const dir = join(docsRoot, id);
-				mkdirSync(join(dir, "work"), { recursive: true });
-				const pdf = join(dir, "source.pdf");
-				copyFileSync(p, pdf);
-				lib.addDocument({ id, title: basename(p).replace(/\.pdf$/i, ""), fileName: basename(p), pdfPath: pdf, workDir: join(dir, "work") });
-				lib.setStage(id, "IMPORTED", { status: "done", finishedAt: new Date().toISOString(), msg: basename(p) });
-				ids.push(id);
+				ids.push(addPdf(basename(p), (dest) => copyFileSync(p, dest)));
 			}
 			pf.send("docsChanged", {});
 			return { docIds: ids };
@@ -389,6 +382,28 @@ export function createBackend(pf: Platform) {
 	};
 
 	/** Files of a document for the webview: the PDF, crops, page images. Only paths inside the doc folder. */
+	/** Create a library document from a PDF; `write` puts the bytes at the given destination path. */
+	function addPdf(fileName: string, write: (dest: string) => void) {
+		const id = newId("d_");
+		const dir = join(docsRoot, id);
+		mkdirSync(join(dir, "work"), { recursive: true });
+		const pdf = join(dir, "source.pdf");
+		write(pdf);
+		lib.addDocument({ id, title: fileName.replace(/\.pdf$/i, ""), fileName, pdfPath: pdf, workDir: join(dir, "work") });
+		lib.setStage(id, "IMPORTED", { status: "done", finishedAt: new Date().toISOString(), msg: fileName });
+		return id;
+	}
+
+	/** Import a PDF whose bytes came from the webview (drag & drop: WKWebView gives no file path). */
+	function importPdfBytes(name: string, bytes: Uint8Array): string | null {
+		const fileName = basename(name || "document.pdf");
+		const isPdf = bytes.length >= 5 && new TextDecoder().decode(bytes.subarray(0, 1024)).includes("%PDF-");
+		if (!isPdf) return null;
+		const id = addPdf(/\.pdf$/i.test(fileName) ? fileName : `${fileName}.pdf`, (dest) => writeFileSync(dest, bytes));
+		pf.send("docsChanged", {});
+		return id;
+	}
+
 	function serveFile(docId: string, rel: string): Response {
 		const row = lib.docRow(docId);
 		if (!row) return new Response("not found", { status: 404 });
@@ -406,7 +421,7 @@ export function createBackend(pf: Platform) {
 	}
 
 	const setServer = (origin: string, token: string) => Object.assign(server, { origin, token });
-	return { handlers, setServer, lib, bridge, runner, serveFile, cropUrl, settingsDefault: DEFAULT_SETTINGS, readFileSync };
+	return { handlers, setServer, lib, bridge, runner, serveFile, importPdfBytes, cropUrl, settingsDefault: DEFAULT_SETTINGS, readFileSync };
 }
 
 export type Backend = ReturnType<typeof createBackend>;
