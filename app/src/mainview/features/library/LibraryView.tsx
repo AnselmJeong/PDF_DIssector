@@ -19,6 +19,7 @@ export const STATUS: Record<DocStatus, { label: string; cls: string }> = {
 	imported: { label: "브리핑 대기", cls: "bg-secondary text-secondary-foreground" },
 	queued: { label: "대기 중", cls: "bg-secondary text-secondary-foreground" },
 	processing: { label: "처리 중", cls: "bg-primary/15 text-primary" },
+	awaiting_fixes: { label: "보정 확인 대기", cls: "bg-amber-500/15 text-amber-700 dark:text-amber-400" },
 	needs_review: { label: "검토 필요", cls: "bg-amber-500/15 text-amber-700 dark:text-amber-400" },
 	done: { label: "완료", cls: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" },
 	failed: { label: "실패", cls: "bg-destructive/15 text-destructive" },
@@ -108,7 +109,7 @@ export function LibraryView() {
 			if (genre && d.genre !== genre) return false;
 			if (filter === "active") return d.status === "processing" || d.status === "queued" || d.status === "imported";
 			if (filter === "done") return d.status === "done";
-			if (filter === "attention") return d.status === "needs_review" || d.status === "failed" || d.status === "canceled";
+			if (filter === "attention") return d.status === "needs_review" || d.status === "awaiting_fixes" || d.status === "failed" || d.status === "canceled";
 			return true;
 		});
 	}, [docs.data, query, filter, genre]);

@@ -94,7 +94,7 @@ export function createBackend(pf: Platform) {
 				pf.send("jobDone", m);
 				pf.send("docsChanged", {});
 				const d = lib.docRow(m.docId);
-				pf.notify(m.ok ? "해설 준비 완료" : "처리 실패", `${(d?.title as string) ?? ""}${m.error ? `: ${m.error}` : ""}`);
+				pf.notify(m.paused ? "레이아웃 보정 확인 대기" : m.ok ? "해설 준비 완료" : "처리 실패", `${(d?.title as string) ?? ""}${m.error ? `: ${m.error}` : ""}`);
 			},
 		},
 	});

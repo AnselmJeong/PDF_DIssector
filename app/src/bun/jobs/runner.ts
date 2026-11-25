@@ -23,7 +23,7 @@ export interface RunnerDeps {
 	refs: () => Promise<P.References>;
 	emit: {
 		progress: (m: { docId: string; stage: Stage; status: StageRecord["status"]; pct: number; msg: string; tokens: number; costUsd: number }) => void;
-		done: (m: { docId: string; ok: boolean; error?: string }) => void;
+		done: (m: { docId: string; ok: boolean; error?: string; paused?: boolean }) => void;
 		/** The set of queued/running documents changed. */
 		changed?: () => void;
 	};
@@ -31,6 +31,8 @@ export interface RunnerDeps {
 }
 
 class Canceled extends Error {}
+/** Stops a run after the page inspection when the user chose to review the layout fixes (settings.reviewLayout). */
+class Paused extends Error {}
 
 const PURPOSE_FALLBACK: Brief = { purpose: "whole argument", familiarity: "", density: "medium", questions: [], notesLang: "ko" };
 
@@ -157,6 +159,11 @@ export class JobRunner {
 		void this.run(docId, jobId)
 			.then(() => this.d.emit.done({ docId, ok: true }))
 			.catch((e: Error) => {
+				if (e instanceof Paused) {
+					this.d.lib.updateDocument(docId, { status: "awaiting_fixes", error: null });
+					this.d.emit.done({ docId, ok: false, paused: true, error: "레이아웃 보정을 확인한 뒤 이어서 처리하세요" });
+					return;
+				}
 				const canceled = e instanceof Canceled;
 				this.d.lib.updateDocument(docId, { status: canceled ? "canceled" : "failed", error: canceled ? null : e.message });
 				this.d.emit.done({ docId, ok: false, error: canceled ? "취소됨" : e.message });
@@ -214,7 +221,13 @@ export class JobRunner {
 				this.progress(ctx, "failed", 100, err.message.slice(0, 300));
 				throw err;
 			}
+			// Layout review is opt-in: by default the AI's fixes are applied and the run goes straight on.
+			if (stage === "INSPECTED" && this.d.settings().reviewLayout && this.pendingFixes(work) > 0) throw new Paused("awaiting layout review");
 		}
+	}
+
+	private pendingFixes(work: Work) {
+		return existsSync(work.path("fixes_all.json")) ? readJson<FixOp[]>(work.path("fixes_all.json")).length : 0;
 	}
 
 	private checkCanceled(docId: string) {

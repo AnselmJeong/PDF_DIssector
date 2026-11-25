@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpenText, Clock, FlaskConical, Library as LibraryIcon, Loader2, Moon, Settings as SettingsIcon, Sun } from "lucide-react";
+import { BookOpenText, Clock, FlaskConical, Library as LibraryIcon, Loader2, Moon, PauseCircle, Settings as SettingsIcon, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { api, on } from "@/lib/rpc";
@@ -40,14 +40,16 @@ export default function App() {
 				qc.invalidateQueries({ queryKey: ["docs"] });
 				qc.invalidateQueries({ queryKey: ["job", m.docId] });
 				qc.invalidateQueries({ queryKey: ["reader", m.docId] });
-				if (m.ok) toast.success("해설이 준비되었습니다", { action: { label: "열기", onClick: () => go({ name: "reader", docId: m.docId }) } });
+				if (m.paused)
+					toast.info("레이아웃 보정을 확인해 주세요", { action: { label: "확인", onClick: () => go({ name: "processing", docId: m.docId }) } });
+				else if (m.ok) toast.success("해설이 준비되었습니다", { action: { label: "열기", onClick: () => go({ name: "reader", docId: m.docId }) } });
 				else toast.error(`처리 중단: ${m.error ?? ""}`);
 			}),
 		];
 		return () => offs.forEach((f) => f());
 	}, [qc, go]);
 
-	const processing = (docs.data ?? []).filter((d) => d.status === "processing" || d.status === "queued");
+	const processing = (docs.data ?? []).filter((d) => d.status === "processing" || d.status === "queued" || d.status === "awaiting_fixes");
 	const nav = [
 		{ key: "library", label: "라이브러리", icon: LibraryIcon, active: view.name === "library", onClick: () => go({ name: "library" }) },
 		{ key: "settings", label: "설정", icon: SettingsIcon, active: view.name === "settings", onClick: () => go({ name: "settings" }) },
@@ -86,7 +88,13 @@ export default function App() {
 								view.name === "processing" && view.docId === d.id && "bg-accent",
 							)}
 						>
-							{d.status === "queued" ? <Clock className="size-3.5 shrink-0 text-muted-foreground" /> : <Loader2 className="size-3.5 shrink-0 animate-spin" />}
+							{d.status === "queued" ? (
+								<Clock className="size-3.5 shrink-0 text-muted-foreground" />
+							) : d.status === "awaiting_fixes" ? (
+								<PauseCircle className="size-3.5 shrink-0 text-amber-600" />
+							) : (
+								<Loader2 className="size-3.5 shrink-0 animate-spin" />
+							)}
 							<span className="truncate">{d.title}</span>
 							<span className="ml-auto shrink-0 text-[10px] text-muted-foreground tabular-nums">
 								{d.status === "queued" ? "대기" : d.progress != null ? `${Math.round(d.progress * 100)}%` : ""}
