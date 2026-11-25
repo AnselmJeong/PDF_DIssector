@@ -200,7 +200,11 @@ export function BriefDialog() {
 								</div>
 								<p className="pt-2 text-xs text-muted-foreground">
 									추출 → 페이지 검수 → 논문 이해 → 해설 작성 → 수식·그림 해설 → 검증 → 2차 검토 순으로 진행합니다. 10쪽 논문 기준 몇 분이 걸리고, 토큰 사용량은 처리 화면에 단계별로 표시됩니다
-									{settings.data?.llmBackend === "api" ? ` (문서당 상한 $${settings.data.costCapUsd})` : " (Claude 구독 사용)"}.
+									{settings.data?.llmBackend === "api"
+										? ` (문서당 상한 $${settings.data.costCapUsd})`
+										: settings.data?.llmBackend === "ollama"
+											? ` (Ollama: ${settings.data.ollama.model || "모델 미지정"})`
+											: " (Claude 구독 사용)"}.
 								</p>
 							</div>
 						</StepperContent>

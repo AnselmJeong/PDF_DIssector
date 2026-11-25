@@ -13,6 +13,7 @@ import * as P from "./llm/prompts";
 import * as S from "./llm/schemas";
 import { locateEngine, PdfxBridge } from "./pipeline/bridge";
 import { SecretStore } from "./secrets";
+import { OllamaClient } from "./llm/ollama";
 
 type Handlers = { [K in keyof BunRequests]: (p: BunRequests[K]["params"]) => Promise<BunRequests[K]["response"]> };
 
@@ -30,6 +31,9 @@ export function createBackend(pf: Platform) {
 	mkdirSync(pf.dataDir, { recursive: true });
 	const lib = new Library(join(pf.dataDir, "library.sqlite"));
 	const secrets = new SecretStore(pf.dataDir);
+	const ollamaSecrets = new SecretStore(pf.dataDir, "ollama-api-key", "OLLAMA_API_KEY", ".ollama-key");
+	/** Ollama Cloud needs a key; a local server (localhost) does not. */
+	const ollamaNeedsKey = (url: string) => !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(url);
 	let engineInfo = "";
 	// Two engine processes: the `serve` process answers one request at a time, so background jobs get
 	// their own (jobBridge) and the reader/brief dialog (bridge) never wait behind a long pipeline step.
@@ -52,6 +56,10 @@ export function createBackend(pf: Platform) {
 	const llmReady = (): string | null => {
 		const s = lib.settings();
 		if (s.llmBackend === "api") return secrets.has() ? null : "Anthropic API 키가 없습니다. 설정에서 입력하거나 구독(Claude Code) 방식으로 바꾸세요.";
+		if (s.llmBackend === "ollama") {
+			if (!s.ollama.model.trim()) return "Ollama 모델 이름이 없습니다. 설정에서 입력하세요.";
+			return ollamaNeedsKey(s.ollama.baseUrl) && !ollamaSecrets.has() ? "Ollama API 키가 없습니다. 설정에서 입력하세요." : null;
+		}
 		return locateClaude(s.claudePath) ? null : "Claude Code(claude 명령)를 찾지 못했습니다. Claude Code를 설치하고 `claude`로 한 번 로그인하세요.";
 	};
 
@@ -64,6 +72,13 @@ export function createBackend(pf: Platform) {
 			lib.logLlmCall({ docId, jobId: null, stage, model: u.model, tokensIn: u.tokensIn, tokensOut: u.tokensOut, cacheRead: u.cacheRead, cacheWrite: u.cacheWrite, costUsd: u.costUsd, logPath });
 		};
 		const logDir = work ? work.path("llm_log") : join(pf.dataDir, "llm_log");
+		if (s.llmBackend === "ollama") {
+			const model = s.ollama.model.trim();
+			if (!model) throw new Error("Ollama 모델 이름이 없습니다. 설정에서 입력하세요.");
+			const key = ollamaSecrets.get();
+			if (!key && ollamaNeedsKey(s.ollama.baseUrl)) throw new Error("Ollama API 키가 없습니다. 설정에서 입력하세요.");
+			return new OllamaClient(s.ollama.baseUrl.trim() || "https://ollama.com/v1", key, model, logDir, onUsage);
+		}
 		if (s.llmBackend !== "api") {
 			const bin = locateClaude(s.claudePath);
 			if (!bin) throw new Error("Claude Code(claude 명령)를 찾지 못했습니다. 설치 후 `claude`로 로그인하세요.");
@@ -363,7 +378,7 @@ export function createBackend(pf: Platform) {
 			const s = lib.settings();
 			const bin = locateClaude(s.claudePath);
 			const ver = bin ? claudeVersion(bin) : null;
-			return { ...s, hasApiKey: secrets.has(), engineOk, engineInfo, claudeOk: !!ver, claudeInfo: ver ? `${ver} (${bin})` : "claude 명령을 찾지 못했습니다" };
+			return { ...s, hasApiKey: secrets.has(), hasOllamaKey: ollamaSecrets.has(), engineOk, engineInfo, claudeOk: !!ver, claudeInfo: ver ? `${ver} (${bin})` : "claude 명령을 찾지 못했습니다" };
 		},
 		async setSettings({ settings }) {
 			lib.setSettings(settings);
@@ -372,6 +387,10 @@ export function createBackend(pf: Platform) {
 		async setApiKey({ key }) {
 			secrets.set(key && key.trim() ? key.trim() : null);
 			return { ok: true, hasApiKey: secrets.has() };
+		},
+		async setOllamaKey({ key }) {
+			ollamaSecrets.set(key && key.trim() ? key.trim() : null);
+			return { ok: true, hasOllamaKey: ollamaSecrets.has() };
 		},
 		async listRules() {
 			return lib.listRules();

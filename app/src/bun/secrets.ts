@@ -3,13 +3,18 @@ import { chmodSync, existsSync, readFileSync, unlinkSync, writeFileSync } from "
 import { join } from "node:path";
 
 const SERVICE = "dev.anselm.pdfdissector";
-const ACCOUNT = "anthropic-api-key";
 
 export class SecretStore {
-	constructor(private fallbackDir: string) {}
+	/** One store per key: the Anthropic key (default) or the Ollama Cloud key. */
+	constructor(
+		private fallbackDir: string,
+		private account = "anthropic-api-key",
+		private envVar = "ANTHROPIC_API_KEY",
+		private fileName = ".api-key",
+	) {}
 
 	private get file() {
-		return join(this.fallbackDir, ".api-key");
+		return join(this.fallbackDir, this.fileName);
 	}
 
 	private useKeychain() {
@@ -17,9 +22,9 @@ export class SecretStore {
 	}
 
 	get(): string | null {
-		if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY;
+		if (process.env[this.envVar]) return process.env[this.envVar] as string;
 		if (this.useKeychain()) {
-			const r = Bun.spawnSync(["security", "find-generic-password", "-s", SERVICE, "-a", ACCOUNT, "-w"]);
+			const r = Bun.spawnSync(["security", "find-generic-password", "-s", SERVICE, "-a", this.account, "-w"]);
 			if (r.exitCode === 0) return r.stdout.toString().trim() || null;
 			return null;
 		}
@@ -28,10 +33,10 @@ export class SecretStore {
 
 	set(key: string | null) {
 		if (this.useKeychain()) {
-			Bun.spawnSync(["security", "delete-generic-password", "-s", SERVICE, "-a", ACCOUNT]);
+			Bun.spawnSync(["security", "delete-generic-password", "-s", SERVICE, "-a", this.account]);
 			if (key) {
 				// -w as the last argument with a value; the key is passed as an argv element, never through a shell
-				const r = Bun.spawnSync(["security", "add-generic-password", "-s", SERVICE, "-a", ACCOUNT, "-U", "-w", key]);
+				const r = Bun.spawnSync(["security", "add-generic-password", "-s", SERVICE, "-a", this.account, "-U", "-w", key]);
 				if (r.exitCode !== 0) throw new Error("Keychain에 API 키를 저장하지 못했습니다: " + r.stderr.toString());
 			}
 			return;
