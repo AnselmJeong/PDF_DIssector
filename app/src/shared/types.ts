@@ -50,7 +50,7 @@ export interface Brief {
 	pages?: string | null;
 }
 
-export type DocStatus = "imported" | "queued" | "processing" | "needs_review" | "done" | "failed" | "canceled";
+export type DocStatus = "imported" | "queued" | "processing" | "awaiting_fixes" | "needs_review" | "done" | "failed" | "canceled";
 
 export interface DocSummary {
 	id: string;
@@ -139,6 +139,7 @@ export interface Settings {
 	costCapUsd: number;
 	fastMode: boolean; // second read on the helper model, skip the equation/figure deep-dive
 	threeTierView: boolean;
+	reviewLayout: boolean; // pause after the page inspection so the user can pick the layout fixes; off = apply the AI fixes and go on
 	concurrency: number;
 	parallelDocs: number; // how many papers are processed at the same time; the rest wait in a queue
 	acceptedDataNotice: boolean;
@@ -335,7 +336,7 @@ export type BunRequests = {
 
 export type WebviewMessages = {
 	jobProgress: { docId: string; stage: Stage; status: StageRecord["status"]; pct: number; msg: string; tokens: number; costUsd: number; progress?: number };
-	jobDone: { docId: string; ok: boolean; error?: string };
+	jobDone: { docId: string; ok: boolean; error?: string; paused?: boolean };
 	chatDelta: { streamId: string; text: string; done: boolean; error?: string };
 	docsChanged: Record<string, never>;
 }

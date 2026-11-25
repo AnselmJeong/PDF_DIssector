@@ -45,6 +45,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	costCapUsd: 5,
 	fastMode: false,
 	threeTierView: false,
+	reviewLayout: false,
 	concurrency: 3,
 	parallelDocs: 2,
 	acceptedDataNotice: false,

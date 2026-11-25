@@ -167,6 +167,15 @@ export function SettingsView() {
 							</div>
 							<Switch checked={st.fastMode} onCheckedChange={(v) => save({ fastMode: v })} />
 						</div>
+						<div className="flex items-center justify-between rounded-lg border p-3">
+							<div>
+								<div className="text-sm font-medium">레이아웃 보정 직접 확인</div>
+								<div className="text-xs text-muted-foreground">
+									끄면(기본) AI가 제안한 문단·영역 보정을 그대로 적용하고 바로 해설을 씁니다. 켜면 페이지 검수 뒤 멈춰서 보정을 고른 다음 이어서 처리합니다.
+								</div>
+							</div>
+							<Switch checked={st.reviewLayout} onCheckedChange={(v) => save({ reviewLayout: v })} />
+						</div>
 					</CardContent>
 				</Card>
 

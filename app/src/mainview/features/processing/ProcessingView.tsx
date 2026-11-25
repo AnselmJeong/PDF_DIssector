@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpenText, CheckCircle2, CircleDashed, CircleSlash, Loader2, RotateCcw, Square, XCircle } from "lucide-react";
+import { BookOpenText, CheckCircle2, CircleDashed, CircleSlash, Loader2, Play, RotateCcw, Square, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,10 @@ export function ProcessingView({ docId }: { docId: string }) {
 	const job = useQuery({ queryKey: ["job", docId], queryFn: () => api.getJob({ docId }), refetchInterval: (q) => (q.state.data?.running || q.state.data?.queuePosition ? 3000 : false) });
 	const docs = useQuery({ queryKey: ["docs"], queryFn: () => api.listDocs({}) });
 	const doc = docs.data?.find((d) => d.id === docId);
+	const settings = useQuery({ queryKey: ["settings"], queryFn: () => api.getSettings({}) });
+	const awaiting = doc?.status === "awaiting_fixes";
+	// Layout review is opt-in. Without it the fixes are applied automatically, so the page-inspection panel stays hidden.
+	const showLayout = settings.data?.reviewLayout === true || awaiting;
 	const [live, setLive] = useState<{ stage: Stage; pct: number; msg: string } | null>(null);
 
 	useEffect(
@@ -47,6 +51,15 @@ export function ProcessingView({ docId }: { docId: string }) {
 				if (m.docId === docId) setLive({ stage: m.stage, pct: m.pct, msg: m.msg });
 			}),
 		[docId],
+	);
+
+	// Without layout review the user only wants the explanation: open the Reader as soon as it is ready.
+	useEffect(
+		() =>
+			on("jobDone", (m) => {
+				if (m.docId === docId && m.ok && settings.data?.reviewLayout !== true) go({ name: "reader", docId });
+			}),
+		[docId, go, settings.data?.reviewLayout],
 	);
 
 	const stages = (job.data?.stages ?? []).filter((s) => s.stage !== "IMPORTED");
@@ -85,6 +98,10 @@ export function ProcessingView({ docId }: { docId: string }) {
 					{running || queuePos ? (
 						<Button variant="outline" onClick={() => api.cancelJob({ docId }).then(() => qc.invalidateQueries({ queryKey: ["job", docId] }))}>
 							<Square /> {queuePos ? "대기 취소" : "취소"}
+						</Button>
+					) : awaiting ? (
+						<Button onClick={() => resume()}>
+							<Play /> 선택한 보정 적용하고 계속
 						</Button>
 					) : (
 						<Button variant="outline" onClick={() => resume()}>
@@ -147,15 +164,27 @@ export function ProcessingView({ docId }: { docId: string }) {
 					</Timeline>
 				</div>
 				<div className="min-h-0 overflow-y-auto">
-					<Tabs defaultValue="inspect">
+					{awaiting && (
+						<div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+							레이아웃 보정을 확인하는 중이라 처리를 멈췄습니다. 적용할 보정만 켜 두고 <b>선택한 보정 적용하고 계속</b>을 누르면 해설을 씁니다.
+						</div>
+					)}
+					<Tabs defaultValue={showLayout ? "inspect" : "findings"} key={showLayout ? "layout" : "plain"}>
 						<TabsList>
-							<TabsTrigger value="inspect">페이지 검수</TabsTrigger>
+							{showLayout && <TabsTrigger value="inspect">페이지 검수</TabsTrigger>}
 							<TabsTrigger value="findings">2차 검토 ({job.data?.findings.length ?? 0})</TabsTrigger>
 						</TabsList>
-						<TabsContent value="inspect">
-							<InspectPanel docId={docId} />
-						</TabsContent>
+						{showLayout && (
+							<TabsContent value="inspect">
+								<InspectPanel docId={docId} awaiting={awaiting} />
+							</TabsContent>
+						)}
 						<TabsContent value="findings">
+							{!showLayout && (
+								<p className="mb-3 text-xs text-muted-foreground">
+									레이아웃 보정은 AI 제안대로 자동 적용되고, 처리가 끝나면 Reader가 열립니다. 보정을 직접 고르려면 설정에서 <b>레이아웃 보정 직접 확인</b>을 켜세요.
+								</p>
+							)}
 							<div className="space-y-2">
 								{(job.data?.findings ?? []).length === 0 && <p className="text-sm text-muted-foreground">아직 2차 검토 결과가 없습니다.</p>}
 								{(job.data?.findings ?? []).map((f, i) => (
@@ -182,7 +211,7 @@ export function ProcessingView({ docId }: { docId: string }) {
 	);
 }
 
-function InspectPanel({ docId }: { docId: string }) {
+function InspectPanel({ docId, awaiting }: { docId: string; awaiting: boolean }) {
 	const qc = useQueryClient();
 	const job = useQuery({ queryKey: ["job", docId], queryFn: () => api.getJob({ docId }) });
 	const overlays = job.data?.overlays ?? [];
@@ -223,7 +252,7 @@ function InspectPanel({ docId }: { docId: string }) {
 							</div>
 						</div>
 					))}
-					{fixes.length > 0 && (
+					{fixes.length > 0 && !awaiting && (
 						<Button
 							size="sm"
 							variant="outline"
