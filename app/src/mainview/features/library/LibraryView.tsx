@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, BookOpenText, FileUp, Loader2, MoreHorizontal, Play, RotateCcw, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { api, isDesktop } from "@/lib/rpc";
+import { api, isDesktop, uploadPdf } from "@/lib/rpc";
 import { useApp } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import type { DocStatus, DocSummary } from "../../../shared/types";
@@ -52,16 +52,53 @@ export function LibraryView() {
 		if (paths.length) importPaths.mutate(paths);
 	};
 
+	const dropFiles = useMutation({
+		mutationFn: async (files: File[]) => {
+			const ids: string[] = [];
+			const errors: string[] = [];
+			for (const f of files) {
+				try {
+					ids.push(await uploadPdf(f));
+				} catch (e) {
+					errors.push((e as Error).message);
+				}
+			}
+			return { ids, errors };
+		},
+		onSuccess: ({ ids, errors }) => {
+			qc.invalidateQueries({ queryKey: ["docs"] });
+			for (const m of errors) toast.error(m);
+			if (ids.length) setBriefFor(ids);
+		},
+		onError: (e: Error) => toast.error(e.message),
+	});
+
 	const onDrop = (e: React.DragEvent) => {
 		e.preventDefault();
+		e.stopPropagation();
 		setDrag(false);
-		// WKWebView exposes the dropped file's path through File.path on Electrobun; fall back to the picker
-		const paths = Array.from(e.dataTransfer.files)
-			.map((f) => (f as File & { path?: string }).path)
-			.filter((p): p is string => !!p);
-		if (paths.length) importPaths.mutate(paths);
-		else void pick();
+		const files = Array.from(e.dataTransfer.files);
+		const pdfs = files.filter((f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name));
+		if (!pdfs.length) {
+			toast.error(files.length ? "PDF 파일만 넣을 수 있습니다" : "끌어다 놓은 파일을 읽지 못했습니다");
+			return;
+		}
+		if (pdfs.length < files.length) toast.warning(`PDF가 아닌 파일 ${files.length - pdfs.length}개는 건너뜁니다`);
+		dropFiles.mutate(pdfs);
 	};
+
+	// Files dropped outside the drop zone must not make the webview navigate to them.
+	useEffect(() => {
+		const stop = (e: DragEvent) => e.preventDefault();
+		window.addEventListener("dragover", stop);
+		window.addEventListener("drop", stop);
+		return () => {
+			window.removeEventListener("dragover", stop);
+			window.removeEventListener("drop", stop);
+		};
+	}, []);
+
+	const busy = importPaths.isPending || dropFiles.isPending;
 
 	const genres = useMemo(() => [...new Set((docs.data ?? []).map((d) => d.genre).filter(Boolean))] as string[], [docs.data]);
 	const rows = useMemo(() => {
@@ -92,8 +129,8 @@ export function LibraryView() {
 						<Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
 						<Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="제목, 저자, 저널, DOI 검색" className="w-72 pl-8" />
 					</div>
-					<Button onClick={pick} disabled={importPaths.isPending}>
-						{importPaths.isPending ? <Loader2 className="animate-spin" /> : <FileUp />} PDF 추가
+					<Button onClick={pick} disabled={busy}>
+						{busy ? <Loader2 className="animate-spin" /> : <FileUp />} PDF 추가
 					</Button>
 				</div>
 			</header>
@@ -123,9 +160,11 @@ export function LibraryView() {
 						e.preventDefault();
 						setDrag(true);
 					}}
-					onDragLeave={() => setDrag(false)}
+					onDragLeave={(e) => {
+						if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDrag(false);
+					}}
 					onDrop={onDrop}
-					onClick={pick}
+					onClick={() => !busy && void pick()}
 					data-testid="dropzone"
 					className={cn(
 						"flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-6 py-7 text-center transition",

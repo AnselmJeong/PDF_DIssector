@@ -76,4 +76,16 @@ export function fileUrl(path: string) {
 	return `${fileServer?.origin ?? ""}${path}${sep}t=${fileServer?.token ?? ""}`;
 }
 
+/** Send a dropped PDF's bytes to the backend (WKWebView gives dropped files no path). Returns the new doc id. */
+export async function uploadPdf(file: File): Promise<string> {
+	// Raw bytes, token in the query: a "simple" request, so no CORS preflight from the views:// origin.
+	const r = await fetch(`${fileServer?.origin ?? ""}/upload?name=${encodeURIComponent(file.name)}&t=${fileServer?.token ?? ""}`, {
+		method: "POST",
+		body: await file.arrayBuffer(),
+	});
+	const j = await r.json().catch(() => ({}));
+	if (!r.ok || !j.docId) throw new Error(j.error ?? `${file.name}: 가져오지 못했습니다 (HTTP ${r.status})`);
+	return j.docId;
+}
+
 export const isDesktop = inElectrobun;

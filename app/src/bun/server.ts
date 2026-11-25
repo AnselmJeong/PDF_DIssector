@@ -21,6 +21,14 @@ export function startServer(backend: Backend, opts: { port?: number; rpc?: boole
 				for (const [k, v] of Object.entries(cors)) res.headers.set(k, v);
 				return res;
 			}
+			if (url.pathname === "/upload" && req.method === "POST") {
+				// Dropped PDFs: the webview posts each file's bytes (WKWebView exposes no file path).
+				if (tok !== token) return new Response("forbidden", { status: 403, headers: cors });
+				const bytes = new Uint8Array(await req.arrayBuffer());
+				const docId = backend.importPdfBytes(url.searchParams.get("name") ?? "", bytes);
+				if (!docId) return Response.json({ error: "PDF 파일이 아닙니다" }, { status: 400, headers: cors });
+				return Response.json({ docId }, { headers: cors });
+			}
 			if (opts.rpc && url.pathname.startsWith("/rpc/") && req.method === "POST") {
 				if (tok !== token) return new Response("forbidden", { status: 403, headers: cors });
 				const name = url.pathname.slice(5) as keyof Backend["handlers"];
