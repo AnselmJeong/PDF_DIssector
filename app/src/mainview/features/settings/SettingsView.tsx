@@ -24,6 +24,7 @@ export function SettingsView() {
 	const s = useQuery({ queryKey: ["settings"], queryFn: () => api.getSettings({}) });
 	const rules = useQuery({ queryKey: ["rules"], queryFn: () => api.listRules({}) });
 	const [key, setKey] = useState("");
+	const [okey, setOkey] = useState("");
 	const [rule, setRule] = useState("");
 	const [scope, setScope] = useState<UserRule["scope"]>("method");
 
@@ -41,7 +42,7 @@ export function SettingsView() {
 
 				<Card>
 					<CardHeader>
-						<CardTitle className="text-base">Claude 연결 방식</CardTitle>
+						<CardTitle className="text-base">해설 생성 연결 방식</CardTitle>
 						<CardDescription>구독 방식은 이 Mac에 로그인된 Claude Code(Pro/Max 구독)로 호출하므로 API 요금이 따로 나가지 않고 구독 사용량에서 차감됩니다.</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-3">
@@ -66,6 +67,13 @@ export function SettingsView() {
 								<div>
 									<div className="text-sm font-medium">Anthropic API 키</div>
 									<div className="text-xs text-muted-foreground">토큰 사용량만큼 API 계정에 청구됩니다.</div>
+								</div>
+							</Label>
+							<Label className="flex items-start gap-3 rounded-lg border p-3 font-normal has-[[data-state=checked]]:border-primary">
+								<RadioGroupItem value="ollama" className="mt-0.5" data-testid="backend-ollama" />
+								<div>
+									<div className="text-sm font-medium">Ollama (OpenAI 호환 API)</div>
+									<div className="text-xs text-muted-foreground">Ollama Cloud(ollama.com) 또는 이 Mac의 Ollama 서버로 해설을 만듭니다. 지정한 모델 하나가 모든 단계를 맡습니다.</div>
 								</div>
 							</Label>
 						</RadioGroup>
@@ -116,16 +124,103 @@ export function SettingsView() {
 				</Card>
 				)}
 
+				{st.llmBackend === "ollama" && (
+					<Card>
+						<CardHeader>
+							<CardTitle className="flex items-center gap-2 text-base">
+								<KeyRound className="size-4" /> Ollama 연결
+							</CardTitle>
+							<CardDescription>
+								API 키는 macOS 키체인에 저장되고 화면(웹뷰)으로는 전달되지 않습니다. 키는 ollama.com의 Settings → Keys에서 만듭니다. 이 Mac의 Ollama를 쓰려면 주소를{" "}
+								<code className="rounded bg-muted px-1">http://localhost:11434/v1</code>로 바꾸세요(키 불필요).
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="space-y-3">
+							<div className="grid grid-cols-[120px_1fr] items-center gap-3">
+								<Label htmlFor="ollama-url">API 주소</Label>
+								<Input
+									id="ollama-url"
+									key={`url-${st.ollama.baseUrl}`}
+									defaultValue={st.ollama.baseUrl}
+									placeholder="https://ollama.com/v1"
+									onBlur={(e) => {
+										const v = e.target.value.trim() || "https://ollama.com/v1";
+										if (v !== st.ollama.baseUrl) save({ ollama: { ...st.ollama, baseUrl: v } });
+									}}
+									className="font-mono text-xs"
+									data-testid="ollama-url"
+								/>
+							</div>
+							<div className="grid grid-cols-[120px_1fr] items-center gap-3">
+								<Label htmlFor="ollama-model">모델 이름</Label>
+								<Input
+									id="ollama-model"
+									key={`model-${st.ollama.model}`}
+									defaultValue={st.ollama.model}
+									placeholder="예: kimi-k3, glm-5.3, gpt-oss:120b"
+									onBlur={(e) => {
+										const v = e.target.value.trim();
+										if (v !== st.ollama.model) save({ ollama: { ...st.ollama, model: v } });
+									}}
+									className="font-mono text-xs"
+									data-testid="ollama-model"
+								/>
+							</div>
+							<div className="grid grid-cols-[120px_1fr] items-center gap-3">
+								<Label>API 키</Label>
+								<div className="flex items-center gap-2">
+									<div className="flex items-center gap-1.5 text-sm whitespace-nowrap">
+										{st.hasOllamaKey ? <CheckCircle2 className="size-4 text-emerald-600" /> : <XCircle className="size-4 text-destructive" />}
+										{st.hasOllamaKey ? "저장됨" : "없음"}
+									</div>
+									<Input type="password" placeholder="Ollama API 키" value={okey} onChange={(e) => setOkey(e.target.value)} className="flex-1" data-testid="ollama-key" />
+									<Button
+										onClick={async () => {
+											try {
+												await api.setOllamaKey({ key: okey });
+												setOkey("");
+												toast.success("Ollama API 키를 저장했습니다");
+												qc.invalidateQueries({ queryKey: ["settings"] });
+											} catch (e) {
+												toast.error((e as Error).message);
+											}
+										}}
+										disabled={!okey.trim()}
+									>
+										저장
+									</Button>
+									{st.hasOllamaKey && (
+										<Button
+											variant="ghost"
+											onClick={async () => {
+												await api.setOllamaKey({ key: null });
+												qc.invalidateQueries({ queryKey: ["settings"] });
+											}}
+										>
+											삭제
+										</Button>
+									)}
+								</div>
+							</div>
+							<div className="text-xs text-muted-foreground">그림·수식 해설 단계는 페이지 이미지를 보내므로, 비전(이미지 입력)을 지원하는 모델을 고르세요.</div>
+						</CardContent>
+					</Card>
+				)}
+
 				<Card>
 					<CardHeader>
 						<CardTitle className="text-base">모델과 비용</CardTitle>
 						<CardDescription>
 							가격은 입력 / 출력 100만 토큰당 달러입니다.{" "}
-							{st.llmBackend === "subscription" ? "구독 방식에서는 청구되지 않고, 화면의 비용은 API로 환산한 참고값입니다." : "원 개발자 시험에서 6쪽 논문이 약 13만 토큰을 썼습니다."}
+							{st.llmBackend === "subscription"
+								? "구독 방식에서는 청구되지 않고, 화면의 비용은 API로 환산한 참고값입니다."
+								: st.llmBackend === "ollama"
+									? "Ollama는 요금제로 청구되므로 비용은 $0로 기록되고 토큰 수만 남습니다. 모델은 위 Ollama 연결에서 정합니다."
+									: "원 개발자 시험에서 6쪽 논문이 약 13만 토큰을 썼습니다."}
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
-						{(
+						{st.llmBackend !== "ollama" && (
 							[
 								["writer", "해설 작성 (논문 이해, 문단 해설, 수식·그림)"],
 								["reviewer", "검수·2차 검토·질문 답변"],

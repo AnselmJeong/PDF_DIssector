@@ -137,12 +137,23 @@ export function LibraryView() {
 			</header>
 
 			<div className="flex flex-col gap-3 px-6 pt-4">
-				{settings.data && (settings.data.llmBackend === "api" ? !settings.data.hasApiKey : !settings.data.claudeOk) && (
+				{settings.data &&
+					(settings.data.llmBackend === "api"
+						? !settings.data.hasApiKey
+						: settings.data.llmBackend === "ollama"
+							? !settings.data.ollama.model.trim() || (!settings.data.hasOllamaKey && !/^https?:\/\/(localhost|127\.0\.0\.1)/.test(settings.data.ollama.baseUrl))
+							: !settings.data.claudeOk) && (
 					<Alert>
 						<AlertTriangle />
-						<AlertTitle>{settings.data.llmBackend === "api" ? "Anthropic API 키가 없습니다" : "Claude Code 로그인을 찾지 못했습니다"}</AlertTitle>
+						<AlertTitle>
+							{settings.data.llmBackend === "api"
+								? "Anthropic API 키가 없습니다"
+								: settings.data.llmBackend === "ollama"
+									? "Ollama 모델 이름이나 API 키가 없습니다"
+									: "Claude Code 로그인을 찾지 못했습니다"}
+						</AlertTitle>
 						<AlertDescription>
-							해설 작성에는 Claude 연결이 필요합니다.{" "}
+							해설 작성에는 모델 연결이 필요합니다.{" "}
 							<button className="underline" onClick={() => go({ name: "settings" })}>
 								설정에서 연결 방식을 확인하세요.
 							</button>

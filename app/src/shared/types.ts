@@ -131,7 +131,8 @@ export interface Finding {
 }
 
 export interface Settings {
-	llmBackend: "subscription" | "api"; // subscription = Claude Code CLI login; api = Anthropic API key
+	llmBackend: "subscription" | "api" | "ollama"; // subscription = Claude Code CLI login; api = Anthropic API key; ollama = OpenAI-compatible Ollama API
+	ollama: { baseUrl: string; model: string }; // one model serves every role on the ollama backend
 	claudePath: string | null;
 	models: { writer: string; reviewer: string; helper: string };
 	defaultDensity: Density;
@@ -325,9 +326,10 @@ export type BunRequests = {
 	deleteAnnotation: { params: { docId: string; id: string }; response: { ok: true } };
 	exportHtml: { params: { docId: string; dir?: string }; response: { path: string } };
 	showInFolder: { params: { path: string }; response: { ok: true } };
-	getSettings: { params: Record<string, never>; response: Settings & { hasApiKey: boolean; engineOk: boolean; engineInfo: string; claudeOk: boolean; claudeInfo: string } };
+	getSettings: { params: Record<string, never>; response: Settings & { hasApiKey: boolean; hasOllamaKey: boolean; engineOk: boolean; engineInfo: string; claudeOk: boolean; claudeInfo: string } };
 	setSettings: { params: { settings: Partial<Settings> }; response: { ok: true } };
 	setApiKey: { params: { key: string | null }; response: { ok: true; hasApiKey: boolean } };
+	setOllamaKey: { params: { key: string | null }; response: { ok: true; hasOllamaKey: boolean } };
 	listRules: { params: Record<string, never>; response: UserRule[] };
 	addRule: { params: { scope: UserRule["scope"]; text: string }; response: UserRule };
 	deleteRule: { params: { id: string }; response: { ok: true } };
