@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { api, isDesktop, uploadPdf } from "@/lib/rpc";
 import { useApp } from "@/lib/store";
+import { fmtTokens, fmtUsage, useApiBilling } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import type { DocStatus, DocSummary } from "../../../shared/types";
 import { STAGE_LABEL } from "../../../shared/types";
@@ -114,7 +115,9 @@ export function LibraryView() {
 		});
 	}, [docs.data, query, filter, genre]);
 
+	const apiBilling = useApiBilling();
 	const total = (docs.data ?? []).reduce((a, d) => a + d.costUsd, 0);
+	const totalTokens = (docs.data ?? []).reduce((a, d) => a + d.tokensIn + d.tokensOut, 0);
 
 	return (
 		<div className="flex h-full flex-col">
@@ -122,7 +125,7 @@ export function LibraryView() {
 				<div>
 					<h1 className="text-lg font-semibold">라이브러리</h1>
 					<p className="text-xs text-muted-foreground">
-						논문 {docs.data?.length ?? 0}편 · 누적 API 비용 ${total.toFixed(2)}
+						논문 {docs.data?.length ?? 0}편 · {apiBilling ? `누적 API 비용 $${total.toFixed(2)}` : `누적 ${fmtTokens(totalTokens)} 토큰 (Claude 구독)`}
 					</p>
 				</div>
 				<div className="ml-auto flex items-center gap-2">
@@ -216,7 +219,7 @@ export function LibraryView() {
 							<TableHead>장르</TableHead>
 							<TableHead>상태</TableHead>
 							<TableHead className="text-right">정독 비율</TableHead>
-							<TableHead className="text-right">비용</TableHead>
+							<TableHead className="text-right">{apiBilling ? "비용" : "토큰"}</TableHead>
 							<TableHead>추가일</TableHead>
 							<TableHead />
 						</TableRow>
@@ -230,7 +233,7 @@ export function LibraryView() {
 							</TableRow>
 						)}
 						{rows.map((d) => (
-							<DocRow key={d.id} d={d} />
+							<DocRow key={d.id} d={d} apiBilling={apiBilling} />
 						))}
 					</TableBody>
 				</Table>
@@ -239,7 +242,7 @@ export function LibraryView() {
 	);
 }
 
-function DocRow({ d }: { d: DocSummary }) {
+function DocRow({ d, apiBilling }: { d: DocSummary; apiBilling: boolean }) {
 	const qc = useQueryClient();
 	const { go, setBriefFor } = useApp();
 	const st = STATUS[d.status];
@@ -284,7 +287,7 @@ function DocRow({ d }: { d: DocSummary }) {
 				{d.status === "failed" && d.error && <div className="mt-1 line-clamp-2 max-w-56 text-[11px] text-destructive">{d.error}</div>}
 			</TableCell>
 			<TableCell className="text-right text-xs">{d.closeShare != null ? `${Math.round(d.closeShare * 100)}%` : "-"}</TableCell>
-			<TableCell className="text-right text-xs">${d.costUsd.toFixed(2)}</TableCell>
+			<TableCell className="text-right text-xs">{fmtUsage(d, apiBilling)}</TableCell>
 			<TableCell className="text-xs text-muted-foreground">{new Date(d.createdAt).toLocaleDateString("ko-KR")}</TableCell>
 			<TableCell onClick={(e) => e.stopPropagation()}>
 				<DropdownMenu>
