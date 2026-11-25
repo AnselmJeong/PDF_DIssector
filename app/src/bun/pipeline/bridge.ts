@@ -1,6 +1,7 @@
 // Bridge to the Python engine (pdfx). Light commands go through one long-running `serve` process
 // (JSON lines over stdio); heavy ones (segment) run as one-off `run` processes so cancel = kill.
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type { Subprocess } from "bun";
 
@@ -26,6 +27,27 @@ export function locateEngine(opts: { pythonOverride?: string | null; resourcesDi
 	].filter(Boolean);
 	const python = pyCandidates.find((p) => existsSync(p)) ?? "python3";
 	return { python, engineDir };
+}
+
+/**
+ * MinerU is installed globally as a uv tool (`uv tool install "mineru>=4,<5"`), not in the engine's Python.
+ * Apps launched from Finder get a minimal PATH without ~/.local/bin, so mineru_backend.available() could not
+ * find `mineru-kit`. Add the usual user bin folders to PATH and point MINERU_PYTHON at the uv tool's
+ * interpreter when it exists (an explicit MINERU_PYTHON from the environment wins).
+ */
+export function mineruEnv(env: NodeJS.ProcessEnv = process.env, home = homedir()): Record<string, string> {
+	const binDirs = [env.UV_TOOL_BIN_DIR, env.XDG_BIN_HOME, join(home, ".local", "bin"), "/opt/homebrew/bin", "/usr/local/bin"].filter(
+		(d): d is string => !!d,
+	);
+	const path = [...(env.PATH ?? "/usr/bin:/bin:/usr/sbin:/sbin").split(":").filter(Boolean)];
+	for (const d of binDirs.reverse()) if (!path.includes(d)) path.unshift(d);
+	const out: Record<string, string> = { PATH: path.join(":") };
+	if (!env.MINERU_PYTHON) {
+		const toolDirs = [env.UV_TOOL_DIR, env.XDG_DATA_HOME && join(env.XDG_DATA_HOME, "uv", "tools"), join(home, ".local", "share", "uv", "tools")];
+		const py = toolDirs.filter((d): d is string => !!d).map((d) => join(d, "mineru", "bin", "python")).find((p) => existsSync(p));
+		if (py) out.MINERU_PYTHON = py;
+	}
+	return out;
 }
 
 type Pending = {
@@ -55,7 +77,7 @@ export class PdfxBridge {
 
 	private env() {
 		const pp = [this.loc.engineDir, join(this.loc.engineDir, "site-packages"), process.env.PYTHONPATH].filter(Boolean).join(":");
-		return { ...process.env, PYTHONPATH: pp, PYTHONIOENCODING: "utf-8", PYTHONUNBUFFERED: "1" };
+		return { ...process.env, ...mineruEnv(), PYTHONPATH: pp, PYTHONIOENCODING: "utf-8", PYTHONUNBUFFERED: "1" };
 	}
 
 	private start() {

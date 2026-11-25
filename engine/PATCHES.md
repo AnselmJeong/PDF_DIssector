@@ -15,3 +15,4 @@ Search for `PATCH(pdfx)` in the code.
 | `references/elements_ko.md` | **new**: Korean element names |
 | `references/genres.md` | biomedical genres (CONSORT, STROBE, PRISMA, STARD, ARRIVE, modelling) |
 | `tests/unit/test_common.py` | element count 19 → 26 |
+| `scripts/mineru_backend.py` | `_child_env()` drops `PYTHONPATH`/`PYTHONHOME` for the MinerU child processes (`_can_import`, `run`), so a uv-tool MinerU on another Python version does not load the engine's bundled packages; docstring says `uv tool install` |

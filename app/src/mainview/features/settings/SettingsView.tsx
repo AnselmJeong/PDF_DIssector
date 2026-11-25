@@ -267,8 +267,8 @@ export function SettingsView() {
 							<span className="font-mono text-xs break-all">{st.engineInfo}</span>
 						</div>
 						<div className="text-xs text-muted-foreground">
-							MinerU 설치: 터미널에서 <code className="rounded bg-muted px-1">pip install "mineru&gt;=4,&lt;5" && mineru-kit models download --tier basic</code> 후 앱을 다시
-							실행하면 자동으로 사용합니다.
+							MinerU 설치: 터미널에서 <code className="rounded bg-muted px-1">uv tool install "mineru&gt;=4,&lt;5" && mineru-kit models download --tier basic</code> 후 앱을 다시
+							실행하면 자동으로 사용합니다 (uv tool로 설치한 전역 MinerU를 찾습니다).
 						</div>
 					</CardContent>
 				</Card>
