@@ -7,7 +7,7 @@ export default {
 		dev: "hutch electrobun prepare && bunx vite build && hutch electrobun dev --watch",
 		"dev:hmr": ["bunx", "concurrently", "hutch run hmr", "hutch run start"],
 		hmr: "hutch electrobun prepare && bunx vite --port 5173",
-		build: "hutch electrobun prepare && bunx vite build && bun scripts/build-engine.ts && hutch electrobun build --env=stable",
+		build: "hutch electrobun prepare && bunx vite build && bun scripts/build-engine.ts && hutch electrobun build --env=stable && bun scripts/make-dmg.ts stable",
 		"build:canary": "hutch electrobun prepare && bunx vite build && bun scripts/build-engine.ts && hutch electrobun build --env=canary",
 	},
 	electrobun: {
