@@ -1,4 +1,4 @@
-// How LLM usage is shown. A Claude subscription is not billed per paper, so a dollar figure would
+// How LLM usage is shown. A Claude subscription or an Ollama plan is not billed per paper, so a dollar figure would
 // mislead; there we show token counts instead and keep dollars for the API-key backend only.
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/rpc";

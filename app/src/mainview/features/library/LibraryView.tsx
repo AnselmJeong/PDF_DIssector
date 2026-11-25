@@ -125,7 +125,7 @@ export function LibraryView() {
 				<div>
 					<h1 className="text-lg font-semibold">라이브러리</h1>
 					<p className="text-xs text-muted-foreground">
-						논문 {docs.data?.length ?? 0}편 · {apiBilling ? `누적 API 비용 $${total.toFixed(2)}` : `누적 ${fmtTokens(totalTokens)} 토큰 (Claude 구독)`}
+						논문 {docs.data?.length ?? 0}편 · {apiBilling ? `누적 API 비용 $${total.toFixed(2)}` : `누적 ${fmtTokens(totalTokens)} 토큰 (${settings.data?.llmBackend === "ollama" ? "Ollama" : "Claude 구독"})`}
 					</p>
 				</div>
 				<div className="ml-auto flex items-center gap-2">

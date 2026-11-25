@@ -261,7 +261,7 @@ function InspectPanel({ docId, awaiting }: { docId: string; awaiting: boolean })
 							variant="outline"
 							className="w-full"
 							onClick={async () => {
-								if (!confirm(`보정을 다시 적용하면 문단 번호가 바뀌어 해설을 처음부터 다시 씁니다 (${apiBilling ? "API 비용 발생" : "구독 사용량 소모"}). 계속할까요?`)) return;
+								if (!confirm(`보정을 다시 적용하면 문단 번호가 바뀌어 해설을 처음부터 다시 씁니다 (${apiBilling ? "API 비용 발생" : "요금제 사용량 소모"}). 계속할까요?`)) return;
 								await api.reapplyFixes({ docId });
 								qc.invalidateQueries({ queryKey: ["job", docId] });
 							}}
