@@ -12,3 +12,28 @@ app/engine-dist/
 app/.hutch/
 *.tsbuildinfo
 release/
+
+# Build outputs
+node_modules/
+dist/
+build/
+*.dmg
+*.tar.zst
+
+# Python envs and caches
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+.api-key
+credentials.json
+.claude/settings.local.json
